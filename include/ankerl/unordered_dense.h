@@ -1099,6 +1099,16 @@ private:
     }
 
     template <class K, class M>
+    auto do_insert_or_assign_with_hash(uint64_t hash, K&& key, M&& mapped) -> std::pair<iterator, bool> {
+        auto it_isinserted = try_emplace_with_hash(hash, std::forward<K>(key), std::forward<M>(mapped));
+        if (!it_isinserted.second) {
+            it_isinserted.first->second = std::forward<M>(mapped);
+        }
+        return it_isinserted;
+    }
+
+
+    template <class K, class M>
     auto do_insert_or_assign(K&& key, M&& mapped) -> std::pair<iterator, bool> {
         auto it_isinserted = try_emplace(std::forward<K>(key), std::forward<M>(mapped));
         if (!it_isinserted.second) {
@@ -1127,6 +1137,30 @@ private:
     }
 
     template <typename K, typename... Args>
+    auto do_try_emplace_with_hash(uint64_t hash, K&& key, Args&&... args) -> std::pair<iterator, bool> {
+        // auto hash = mixed_hash(key);
+        auto dist_and_fingerprint = dist_and_fingerprint_from_hash(hash);
+        auto bucket_idx = bucket_idx_from_hash(hash);
+
+        while (true) {
+            auto* bucket = &at(m_buckets, bucket_idx);
+            if (dist_and_fingerprint == bucket->m_dist_and_fingerprint) {
+                if (m_equal(key, get_key(m_values[bucket->m_value_idx]))) {
+                    return {begin() + static_cast<difference_type>(bucket->m_value_idx), false};
+                }
+            } else if (dist_and_fingerprint > bucket->m_dist_and_fingerprint) {
+                return do_place_element(dist_and_fingerprint,
+                                        bucket_idx,
+                                        std::piecewise_construct,
+                                        std::forward_as_tuple(std::forward<K>(key)),
+                                        std::forward_as_tuple(std::forward<Args>(args)...));
+            }
+            dist_and_fingerprint = dist_inc(dist_and_fingerprint);
+            bucket_idx = next(bucket_idx);
+        }
+    }
+
+    template <typename K, typename... Args>
     auto do_try_emplace(K&& key, Args&&... args) -> std::pair<iterator, bool> {
         auto hash = mixed_hash(key);
         auto dist_and_fingerprint = dist_and_fingerprint_from_hash(hash);
@@ -1147,6 +1181,46 @@ private:
             }
             dist_and_fingerprint = dist_inc(dist_and_fingerprint);
             bucket_idx = next(bucket_idx);
+        }
+    }
+
+    template <typename K>
+    auto do_find_with_hash(uint64_t mh, K const& key) -> iterator {
+        if (ANKERL_UNORDERED_DENSE_UNLIKELY(empty())) {
+            return end();
+        }
+
+        // auto mh = mixed_hash(key);
+        auto dist_and_fingerprint = dist_and_fingerprint_from_hash(mh);
+        auto bucket_idx = bucket_idx_from_hash(mh);
+        auto* bucket = &at(m_buckets, bucket_idx);
+
+        // unrolled loop. *Always* check a few directly, then enter the loop. This is faster.
+        if (dist_and_fingerprint == bucket->m_dist_and_fingerprint && m_equal(key, get_key(m_values[bucket->m_value_idx]))) {
+            return begin() + static_cast<difference_type>(bucket->m_value_idx);
+        }
+        dist_and_fingerprint = dist_inc(dist_and_fingerprint);
+        bucket_idx = next(bucket_idx);
+        bucket = &at(m_buckets, bucket_idx);
+
+        if (dist_and_fingerprint == bucket->m_dist_and_fingerprint && m_equal(key, get_key(m_values[bucket->m_value_idx]))) {
+            return begin() + static_cast<difference_type>(bucket->m_value_idx);
+        }
+        dist_and_fingerprint = dist_inc(dist_and_fingerprint);
+        bucket_idx = next(bucket_idx);
+        bucket = &at(m_buckets, bucket_idx);
+
+        while (true) {
+            if (dist_and_fingerprint == bucket->m_dist_and_fingerprint) {
+                if (m_equal(key, get_key(m_values[bucket->m_value_idx]))) {
+                    return begin() + static_cast<difference_type>(bucket->m_value_idx);
+                }
+            } else if (dist_and_fingerprint > bucket->m_dist_and_fingerprint) {
+                return end();
+            }
+            dist_and_fingerprint = dist_inc(dist_and_fingerprint);
+            bucket_idx = next(bucket_idx);
+            bucket = &at(m_buckets, bucket_idx);
         }
     }
 
@@ -1193,6 +1267,14 @@ private:
     template <typename K>
     auto do_find(K const& key) const -> const_iterator {
         return const_cast<table*>(this)->do_find(key); // NOLINT(cppcoreguidelines-pro-type-const-cast)
+    }
+
+    template <typename K, typename Q = T, std::enable_if_t<is_map_v<Q>, bool> = true>
+    auto do_at_with_hash(uint64_t hash, K const& key) -> Q& {
+        if (auto it = do_find_with_hash(hash, key); ANKERL_UNORDERED_DENSE_LIKELY(end() != it)) {
+            return it->second;
+        }
+        on_error_key_not_found();
     }
 
     template <typename K, typename Q = T, std::enable_if_t<is_map_v<Q>, bool> = true>
@@ -1540,6 +1622,33 @@ public:
         return do_insert_or_assign(std::forward<K>(key), std::forward<M>(mapped)).first;
     }
 
+private:
+    // Single arguments for unordered_set can be used without having to construct the value_type
+    template <class K,
+              typename Q = T,
+              typename H = Hash,
+              typename KE = KeyEqual,
+              std::enable_if_t<!is_map_v<Q> && is_transparent_v<H, KE>, bool> = true>
+    auto emplace_with_hash(uint64_t hash, K&& key) -> std::pair<iterator, bool> {
+        // auto hash = mixed_hash(key);
+        auto dist_and_fingerprint = dist_and_fingerprint_from_hash(hash);
+        auto bucket_idx = bucket_idx_from_hash(hash);
+
+        while (dist_and_fingerprint <= at(m_buckets, bucket_idx).m_dist_and_fingerprint) {
+            if (dist_and_fingerprint == at(m_buckets, bucket_idx).m_dist_and_fingerprint &&
+                m_equal(key, m_values[at(m_buckets, bucket_idx).m_value_idx])) {
+                // found it, return without ever actually creating anything
+                return {begin() + static_cast<difference_type>(at(m_buckets, bucket_idx).m_value_idx), false};
+            }
+            dist_and_fingerprint = dist_inc(dist_and_fingerprint);
+            bucket_idx = next(bucket_idx);
+        }
+
+        // value is new, insert element first, so when exception happens we are in a valid state
+        return do_place_element(dist_and_fingerprint, bucket_idx, std::forward<K>(key));
+    }
+
+public:
     // Single arguments for unordered_set can be used without having to construct the value_type
     template <class K,
               typename Q = T,
@@ -1564,7 +1673,41 @@ public:
         // value is new, insert element first, so when exception happens we are in a valid state
         return do_place_element(dist_and_fingerprint, bucket_idx, std::forward<K>(key));
     }
+private:
+    template <class... Args>
+    auto emplace_with_hash(uint64_t hash, Key&& key, Args&&... args) -> std::pair<iterator, bool> {
+        // we have to instantiate the value_type to be able to access the key.
+        // 1. emplace_back the object so it is constructed. 2. If the key is already there, pop it later in the loop.
+        m_values.emplace_back(std::forward<Key>(key), std::forward<Args>(args)...);
 
+        // auto& key = get_key(m_values.emplace_back(std::forward<Args>(args)...));
+        // auto hash = mixed_hash(key);
+        auto dist_and_fingerprint = dist_and_fingerprint_from_hash(hash);
+        auto bucket_idx = bucket_idx_from_hash(hash);
+
+        while (dist_and_fingerprint <= at(m_buckets, bucket_idx).m_dist_and_fingerprint) {
+            if (dist_and_fingerprint == at(m_buckets, bucket_idx).m_dist_and_fingerprint &&
+                m_equal(key, get_key(m_values[at(m_buckets, bucket_idx).m_value_idx]))) {
+                m_values.pop_back(); // value was already there, so get rid of it
+                return {begin() + static_cast<difference_type>(at(m_buckets, bucket_idx).m_value_idx), false};
+            }
+            dist_and_fingerprint = dist_inc(dist_and_fingerprint);
+            bucket_idx = next(bucket_idx);
+        }
+
+        // value is new, place the bucket and shift up until we find an empty spot
+        auto value_idx = static_cast<value_idx_type>(m_values.size() - 1);
+        if (ANKERL_UNORDERED_DENSE_UNLIKELY(is_full())) {
+            // increase_size just rehashes all the data we have in m_values
+            increase_size();
+        } else {
+            // place element and shift up until we find an empty spot
+            place_and_shift_up({dist_and_fingerprint, value_idx}, bucket_idx);
+        }
+        return {begin() + static_cast<difference_type>(value_idx), true};
+    }
+
+public:
     template <class... Args>
     auto emplace(Args&&... args) -> std::pair<iterator, bool> {
         // we have to instantiate the value_type to be able to access the key.
