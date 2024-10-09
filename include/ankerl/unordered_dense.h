@@ -807,12 +807,13 @@ template <class Key,
           class AllocatorOrContainer,
           class Bucket,
           class BucketContainer,
-          bool IsSegmented>
+          bool IsSegmented,
+          template <typename, typename> class Value_Container = std::vector>
 class table : public std::conditional_t<is_map_v<T>, base_table_type_map<T>, base_table_type_set> {
     using underlying_value_type = typename std::conditional_t<is_map_v<T>, std::pair<Key, T>, Key>;
     using underlying_container_type = std::conditional_t<IsSegmented,
                                                          segmented_vector<underlying_value_type, AllocatorOrContainer>,
-                                                         std::vector<underlying_value_type, AllocatorOrContainer>>;
+                                                         Value_Container<underlying_value_type, AllocatorOrContainer>>;
 
 public:
     using value_container_type = std::
