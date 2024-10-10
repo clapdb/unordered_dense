@@ -810,6 +810,8 @@ template <class Key,
           bool IsSegmented,
           template <typename, typename> class Value_Container = std::vector>
 class table : public std::conditional_t<is_map_v<T>, base_table_type_map<T>, base_table_type_set> {
+    template <class K, class V, class H, class Eq, class Alloc, class Buck, class BuctContainer, bool Segmented, uint32_t Shards, typename Dispatcher, template <typename, typename> class ValueContainer>
+    friend class horizontal_sharded_table;
     using underlying_value_type = typename std::conditional_t<is_map_v<T>, std::pair<Key, T>, Key>;
     using underlying_container_type = std::conditional_t<IsSegmented,
                                                          segmented_vector<underlying_value_type, AllocatorOrContainer>,

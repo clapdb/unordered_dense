@@ -5,10 +5,21 @@
 #include <array>
 #include <algorithm>
 #include <numeric>
+#include <type_traits>
 
 namespace ankerl::unordered_dense {
 
 namespace detail {
+
+template<uint32_t Shards>
+class shard_dispatcher {
+public:
+    // TODO(leo): implement a better hash dispatcher to make shards more balanced working with internal_table's hash policy
+    // FIXME
+    auto operator()(uint64_t hash) const -> uint32_t {
+        return hash % Shards;
+    }
+};
 
 template <class Key,
           class T,
@@ -27,38 +38,163 @@ class horizontal_sharded_table {
     // using iterator = typename internal_table::iterator;
     // using const_iterator = typename internal_table::const_iterator;
     using value_type = typename internal_table::value_type;
+    using reference = typename internal_table::reference;
+    using const_reference = typename internal_table::const_reference;
+    using pointer = typename internal_table::pointer;
+
     /** 
      * wrap internal_table::iterator to add shard index
      * if meet the end of the shard, move to the next shard
      * if meet the end of the last shard, return end iterator
      */
     template<bool IsConst>
-    class iterator {
-        uint32_t _shard;
+    class iteratorT {
+        friend class horizontal_sharded_table;
         using internal_iterator = std::conditional_t<IsConst, typename internal_table::const_iterator, typename internal_table::iterator>;
-        internal_iterator _it;
+        using difference_type = std::ptrdiff_t;
+        horizontal_sharded_table const* _table = nullptr;
+        uint32_t _shard = 0;
+        internal_iterator _it = {};
 
+    public:
+        iteratorT(horizontal_sharded_table const* table, uint32_t shard, internal_iterator it) : _table(table), _shard(shard), _it(it) {}
+        // default constructor, generate a end iterator
+        iteratorT() = default;
+        // copy constructor
+        iteratorT(const iteratorT& other) noexcept : _table(other._table), _shard(other._shard), _it(other._it) {}
+
+        // copy a const iterator from iterator
+        template <bool OtherIsConst, typename = typename std::enable_if_t<IsConst && !OtherIsConst>::type>
+        iteratorT(const iteratorT<OtherIsConst>& other) noexcept
+            : _table(other._table)
+            , _shard(other._shard)
+            , _it(other._it) {}
+
+        // move constructor
+        iteratorT(iteratorT&& other) noexcept : _shard(other._shard), _it(other._it) {}
+        // copy assignment
+        auto operator=(const iteratorT& other) -> iteratorT& {
+            _table = other._table;
+            _shard = other._shard;
+            _it = other._it;
+            return *this;
+        }
+
+        // assign a const iterator from a iterator
+        template<bool OtherIsConst, typename = typename std::enable_if_t<IsConst && !OtherIsConst>::type>
+        auto operator=(const iteratorT<OtherIsConst>& other) -> iteratorT& {
+            _table = other._table;
+            _shard = other._shard;
+            _it = other._it;
+            return *this;
+        }
+
+        constexpr auto operator++() noexcept -> iteratorT& {
+            if (++_it == _table->_maps[_shard].end()) {
+                ++_shard;
+                if (_shard < Shards) {
+                    _it = _table->_maps[_shard].begin();
+                }
+            }
+            return *this;
+        }
+
+        constexpr auto operator++(int) noexcept -> iteratorT {
+            auto tmp = *this;
+            if (++(*this) == _table->_maps[_shard].end()) {
+                ++_shard;
+                if (_shard < Shards) {
+                    _it = _table->_maps[_shard].begin();
+                }
+            }
+            return tmp;
+        }
         
-        
-    };
-    class const_iterator : public internal_table::const_iterator {
-        using internal_table::const_iterator::const_iterator;
-    };
+        constexpr auto operator+(difference_type n) const noexcept -> iteratorT {
+            difference_type distance_to_end_in_current_shard = _table->_maps[_shard].end() - _it;
+            if (distance_to_end_in_current_shard > n) { // in the same shard
+                return iteratorT(_shard, _it + n);
+            } else if (_shard == Shards - 1) { // already in the last shard
+                // out of range or end, just return end
+                return {};
+            } else { // in next shard
+                // use recursive call to move to the next shard
+                return iterator(_shard + 1, _table->_maps[_shard + 1].begin()) + (n - distance_to_end_in_current_shard);
+            }
+        }
+
+        constexpr auto operator-(difference_type n) const noexcept -> iteratorT {
+            difference_type distance_to_begin_in_current_shard = _it - _table->_maps[_shard].begin();
+            if (distance_to_begin_in_current_shard > n) {
+                return iteratorT(_shard, _it - n);
+            } else if (_shard == 0) {
+                // out of range or begin, just return begin
+                return _table->_map[0]->begin();
+            } else { // in previous shard
+                // use recursive call to move to the previous shard
+                return iterator(_shard - 1, _table->_maps[_shard - 1].end() - (n - distance_to_begin_in_current_shard));
+            }
+        }
+
+        template<bool OtherIsConst>
+        constexpr auto operator-(iteratorT<OtherIsConst> const& other) const noexcept -> difference_type {
+            if (_shard == other._shard) {
+                return _it - other._it;
+            } else if (_shard > other._shard) {
+                // other is in previous shard
+                difference_type distance = other.end() - other._it;
+                for (uint32_t i = other._shard + 1; i < _shard; ++i) {
+                    distance += _table->_maps[i].size();
+                }
+                distance += _it - _table->_maps[_shard].begin();
+                return distance;
+            }
+                // other is in next shard
+            difference_type distance = _table->_maps[_shard].end() - _it;
+            for (uint32_t i = _shard + 1; i < other._shard; ++i) {
+                distance += _table->_maps[i].size();
+            }
+            distance += other._it - other._maps[other._shard].begin();
+            return -distance;
+        }
+
+        constexpr auto operator*() const noexcept -> std::conditional_t<IsConst, const_reference, reference> {
+            return *_it;
+        }
+
+        constexpr auto operator->() const noexcept -> pointer {
+            return _it.operator->();
+        }
+
+        template<bool OtherIsConst>
+        constexpr auto operator==(iteratorT<OtherIsConst> const& other) const noexcept -> bool {
+            // no need to check shard, internal::iterator is a pointer
+            return _it == other._it;
+        }
+
+        template<bool OtherIsConst>
+        constexpr auto operator!=(iteratorT<OtherIsConst> const& other) const noexcept -> bool {
+            return !(*this == other);
+        }
+    }; // class iteratorT
+    using iterator = iteratorT<false>;
+    using const_iterator = iteratorT<true>;
 
 private:
     std::array<internal_table, Shards> _maps{};
     Dispatcher _dispatcher{};
 
 private:
-    struct dispatch_result {
+    struct dispatch_result_t {
         uint64_t hash;
         uint32_t shard;
-        };
-        auto dispatch(const Key& key) const -> dispatch_result {
-            auto hash = internal_table::mixed_hash(key);
-            return _dispatcher(hash);
-        }
-        
+    };
+
+    auto dispatch(const Key& key) const -> dispatch_result_t {
+        auto hash = _maps[0].mixed_hash(key);
+        return {hash, _dispatcher(hash)};
+    }
+
     public:
     [[nodiscard]] auto empty() const -> bool {
         return std::all_of(_maps.begin(), _maps.end(), [](const auto& map) { return map.empty(); });
@@ -77,13 +213,30 @@ private:
     }
 
     auto insert(value_type const& value) -> std::pair<iterator, bool> {
+        if constexpr (is_map_v<T>) {
+            auto dispatch_result = dispatch(value.first);
+            return _maps[dispatch_result.shard].emplace_with_hash(dispatch_result.hash, value);
+        }
+        static_assert(std::is_constructible_v<Key, decltype(value)> && not is_map_v<T>);
         auto dispatch_result = dispatch(value);
         return _maps[dispatch_result.shard].emplace_with_hash(dispatch_result.hash, value);
     }
 
     auto insert(value_type&& value) -> std::pair<iterator, bool> {
-        auto dispatch_result = dispatch(value);
-        return _maps[dispatch_result.shard].emplace_with_hash(dispatch_result.hash, std::move(value));
+        // check if value_pair is std::pair
+        if constexpr (is_map_v<T>) {
+            Key key{value.first};
+            auto dispatch_result = dispatch(key);
+            auto [internal_iter, success] = _maps[dispatch_result.shard].emplace_with_hash(dispatch_result.hash, std::move(value.first), std::move(value.second));
+            return {iterator(this, dispatch_result.shard, internal_iter), success};
+        } else {
+            static_assert(std::is_constructible_v<Key, decltype(value)> && not is_map_v<T>);
+            Key key{value};
+            auto dispatch_result = dispatch(key);
+            auto [internal_iter, success] =
+                _maps[dispatch_result.shard].emplace_with_hash(dispatch_result.hash, std::move(value));
+            return {iterator(this, dispatch_result.shard, internal_iter), success};
+        }
     }
 
     template <class P, std::enable_if_t<std::is_constructible_v<value_type, P&&>, bool> = true>
@@ -156,7 +309,10 @@ private:
     template<class M, typename Q = T, std::enable_if_t<is_map_v<Q>, bool> = true>
     auto insert_or_assign(const_iterator /*hint*/, Key const& key, M&& mapped) -> iterator {
         auto dispatch_result = dispatch(key);
-        return _maps[dispatch_result.shard].insert_or_assign_with_hash(dispatch_result.hash, key, std::forward<M>(mapped)).first;
+        return {
+            this,
+            dispatch_result.shard,
+            _maps[dispatch_result.shard].insert_or_assign_with_hash(dispatch_result.hash, key, std::forward<M>(mapped)).first};
     }
 
     template<class M, typename Q = T, std::enable_if_t<is_map_v<Q>, bool> = true>
@@ -272,7 +428,6 @@ ANKERL_UNORDERED_DENSE_EXPORT template <class Key,
                                         class Bucket = bucket_type::standard,
                                         class BucketContainer = detail::default_container_t>
 using sharding_map = detail::horizontal_sharded_table<Key, T, Hash, KeyEqual, AllocatorOrContainer, Bucket, BucketContainer, false, 8, detail::shard_dispatcher<8>>;
-
 
 ANKERL_UNORDERED_DENSE_EXPORT template <class Key,
                                         class T = void,

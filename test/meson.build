@@ -79,6 +79,7 @@ test_sources = [
     'unit/unordered_set.cpp',
     'unit/vectorofmaps.cpp',
     'unit/windows_include.cpp',
+    'unit/sharding_dense.cpp',
 ]
 
 # additional compile options
