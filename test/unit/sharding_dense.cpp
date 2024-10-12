@@ -15,10 +15,18 @@ TEST_CASE("insert") {
     map.insert({hi, 3});
 
     REQUIRE(map.size() == 4);
+    REQUIRE(map.empty() == false);
+
+    map.insert(map.cend(), {"end", 4});
+    REQUIRE(map.size() == 5);
 
     ankerl::unordered_dense::sharding_set<std::string> set2;
     set2.insert("hi");
     set2.insert(std::string{"hello"});
     set2.insert("hello");
     REQUIRE(set2.size() == 2);
+    REQUIRE(set2.empty() == false);
+
+    set2.insert(set2.cend(), "end");
+    REQUIRE(set2.size() == 3);
 }

@@ -277,19 +277,17 @@ private:
     }
 
     auto insert(const_iterator /*hint*/, value_type const& value) -> iterator {
-        auto dispatch_result = dispatch(value);
-        return _maps[dispatch_result.shard].emplace_with_hash(dispatch_result.hash, value);
+        return insert(value).first;
     }
 
     auto insert(const_iterator /*hint*/, value_type&& value) -> iterator {
-        auto dispatch_result = dispatch(value);
-        return _maps[dispatch_result.shard].emplace_with_hash(dispatch_result.hash, std::move(value));
+        return insert(std::move(value)).first;
     }
 
     template <class P, std::enable_if_t<std::is_constructible_v<value_type, P&&>, bool> = true>
     auto insert(const_iterator /*hint*/, P&& value) -> iterator {
-        auto dispatch_result = dispatch(value);
-        return _maps[dispatch_result.shard].emplace_with_hash(dispatch_result.hash, std::forward<P>(value));
+        auto real_value = value_type{std::forward<P>(value)};
+        return insert(std::move(real_value)).first;
     }
 
     template <class InputIt>
