@@ -42,24 +42,29 @@ class horizontal_sharded_table {
     using const_reference = typename internal_table::const_reference;
     using pointer = typename internal_table::pointer;
 
-    /** 
+    /**
      * wrap internal_table::iterator to add shard index
      * if meet the end of the shard, move to the next shard
      * if meet the end of the last shard, return end iterator
+     *
+     * the iterator is wrapper, so we can not control the the internal_iterator's implementation.
+     * because we need compare two iterators from different shards, so we can not use internal_iterator's comparation directly.
+     *
      */
     template<bool IsConst>
     class iteratorT {
         friend class horizontal_sharded_table;
         using internal_iterator = std::conditional_t<IsConst, typename internal_table::const_iterator, typename internal_table::iterator>;
-        using difference_type = std::ptrdiff_t;
-        horizontal_sharded_table const* _table = nullptr;
+        using table_type = std::conditional_t<IsConst, const horizontal_sharded_table, horizontal_sharded_table>;
+        using difference_type = typename internal_table::value_container_type::difference_type;
+        table_type * _table = nullptr;
         uint32_t _shard = 0;
         internal_iterator _it = {};
 
     public:
-        iteratorT(horizontal_sharded_table const* table, uint32_t shard, internal_iterator it) : _table(table), _shard(shard), _it(it) {}
-        // default constructor, generate a end iterator
-        iteratorT() = default;
+        iteratorT(table_type * table, uint32_t shard, internal_iterator it) : _table(table), _shard(shard), _it(std::move(it)) {}
+        // no default constructor
+        iteratorT() = delete;
         // copy constructor
         iteratorT(const iteratorT& other) noexcept : _table(other._table), _shard(other._shard), _it(other._it) {}
 
@@ -101,38 +106,33 @@ class horizontal_sharded_table {
 
         constexpr auto operator++(int) noexcept -> iteratorT {
             auto tmp = *this;
-            if (++(*this) == _table->_maps[_shard].end()) {
-                ++_shard;
-                if (_shard < Shards) {
-                    _it = _table->_maps[_shard].begin();
-                }
-            }
+            ++(*this);
             return tmp;
         }
         
         constexpr auto operator+(difference_type n) const noexcept -> iteratorT {
             difference_type distance_to_end_in_current_shard = _table->_maps[_shard].end() - _it;
             if (distance_to_end_in_current_shard > n) { // in the same shard
-                return iteratorT(_shard, _it + n);
+                return iteratorT(_table, _shard, _it + n);
             } else if (_shard == Shards - 1) { // already in the last shard
                 // out of range or end, just return end
-                return {};
+                return iteratorT(_table, _shard, std::move(_table->_maps[_shard].end()));
             } else { // in next shard
                 // use recursive call to move to the next shard
-                return iterator(_shard + 1, _table->_maps[_shard + 1].begin()) + (n - distance_to_end_in_current_shard);
+                return iteratorT(_table, _shard + 1, _table->_maps[_shard + 1].begin()) + (n - distance_to_end_in_current_shard);
             }
         }
 
         constexpr auto operator-(difference_type n) const noexcept -> iteratorT {
             difference_type distance_to_begin_in_current_shard = _it - _table->_maps[_shard].begin();
             if (distance_to_begin_in_current_shard > n) {
-                return iteratorT(_shard, _it - n);
+                return iteratorT(_table, _shard, _it - n);
             } else if (_shard == 0) {
                 // out of range or begin, just return begin
-                return _table->_map[0]->begin();
+                return {_table, 0, _table->_map[0]->begin()};
             } else { // in previous shard
                 // use recursive call to move to the previous shard
-                return iterator(_shard - 1, _table->_maps[_shard - 1].end() - (n - distance_to_begin_in_current_shard));
+                return iterator(_table, _shard - 1, _table->_maps[_shard - 1].end()) - (n - distance_to_begin_in_current_shard);
             }
         }
 
@@ -168,8 +168,14 @@ class horizontal_sharded_table {
 
         template<bool OtherIsConst>
         constexpr auto operator==(iteratorT<OtherIsConst> const& other) const noexcept -> bool {
-            // no need to check shard, internal::iterator is a pointer
-            return _it == other._it;
+            // no need to check shard, internal::iterator is a pointer?
+            // the segment_vector's iterator is not a pointer, just compare the index, it sucks
+            // compare same shard's iterator
+            if (_shard == other._shard) {
+                return _it == other._it;
+            }
+            // if both of them are end, they are equal, else they are not
+            return (_it == _table->_maps[_shard].end() && other._it == _table->_maps[other._shard].end());
         }
 
         template<bool OtherIsConst>
@@ -196,6 +202,31 @@ private:
     }
 
     public:
+    // iterator member functions
+    auto begin() -> iterator {
+        return iterator(this, 0, _maps[0].begin());
+    }
+
+    auto begin() const -> const_iterator {
+        return const_iterator(this, 0, _maps[0].begin());
+    }
+
+    auto cbegin() const -> const_iterator {
+        return const_iterator(this, 0, _maps[0].begin());
+    }
+
+    auto end() -> iterator {
+        return iterator(this, Shards, _maps[Shards - 1].end());
+    }
+
+    auto end() const -> const_iterator {
+        return const_iterator(this, Shards, _maps[Shards - 1].end());
+    }
+
+    auto cend() const -> const_iterator {
+        return const_iterator(this, Shards, _maps[Shards - 1].end());
+    }
+
     [[nodiscard]] auto empty() const -> bool {
         return std::all_of(_maps.begin(), _maps.end(), [](const auto& map) { return map.empty(); });
     }
