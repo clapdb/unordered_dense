@@ -315,13 +315,15 @@ private:
     template <class M, typename Q = T, std::enable_if_t<is_map_v<Q>, bool> = true>
     auto insert_or_assign(Key const& key, M&& mapped) -> std::pair<iterator, bool> {
         auto dispatch_result = dispatch(key);
-        return _maps[dispatch_result.shard].insert_or_assign_with_hash(dispatch_result.hash, key, std::forward<M>(mapped));
+        auto [internal_iter, success] = _maps[dispatch_result.shard].do_insert_or_assign_with_hash(dispatch_result.hash, key, std::forward<M>(mapped));
+        return {iterator(this, dispatch_result.shard, internal_iter), success};
     }
 
     template <class M, typename Q = T, std::enable_if_t<is_map_v<Q>, bool> = true>
     auto insert_or_assign(Key&& key, M&& mapped) -> std::pair<iterator, bool> {
         auto dispatch_result = dispatch(key);
-        return _maps[dispatch_result.shard].insert_or_assign_with_hash(dispatch_result.hash, std::move(key), std::forward<M>(mapped));
+        auto [internal_iter, success] = _maps[dispatch_result.shard].do_insert_or_assign_with_hash(dispatch_result.hash, std::forward<Key>(key), std::forward<M>(mapped));
+        return {iterator(this, dispatch_result.shard, internal_iter), success};
     }
 
     template<typename K,
@@ -332,7 +334,8 @@ private:
              std::enable_if_t<is_map_v<Q> && is_transparent_v<H, KE>, bool> = true>
     auto insert_or_assign(K&& key, M&& mapped) -> std::pair<iterator, bool> {
         auto dispatch_result = dispatch(key);
-        return _maps[dispatch_result.shard].insert_or_assign_with_hash(dispatch_result.hash, std::forward<K>(key), std::forward<M>(mapped));
+        auto [internal_iter, success] = _maps[dispatch_result.shard].do_insert_or_assign_with_hash(dispatch_result.hash, std::forward<K>(key), std::forward<M>(mapped));
+        return {iterator(this, dispatch_result.shard, internal_iter), success};
     }
 
     template<class M, typename Q = T, std::enable_if_t<is_map_v<Q>, bool> = true>
@@ -341,13 +344,15 @@ private:
         return {
             this,
             dispatch_result.shard,
-            _maps[dispatch_result.shard].insert_or_assign_with_hash(dispatch_result.hash, key, std::forward<M>(mapped)).first};
+            _maps[dispatch_result.shard].do_insert_or_assign_with_hash(dispatch_result.hash, key, std::forward<M>(mapped)).first};
     }
 
     template<class M, typename Q = T, std::enable_if_t<is_map_v<Q>, bool> = true>
     auto insert_or_assign(const_iterator /*hint*/, Key&& key, M&& mapped) -> iterator {
         auto dispatch_result = dispatch(key);
-        return _maps[dispatch_result.shard].insert_or_assign_with_hash(dispatch_result.hash, std::move(key), std::forward<M>(mapped)).first;
+        auto [internal_iter, success] = _maps[dispatch_result.shard].do_insert_or_assign_with_hash(
+            dispatch_result.hash, std::move(key), std::forward<M>(mapped));
+        return {this, dispatch_result.shard, internal_iter};
     }
     
     template<typename K,
@@ -358,7 +363,8 @@ private:
              std::enable_if_t<is_map_v<Q> && is_transparent_v<H, KE>, bool> = true>
     auto insert_or_assign(const_iterator /*hint*/, K&& key, M&& mapped) -> iterator {
         auto dispatch_result = dispatch(key);
-        return _maps[dispatch_result.shard].insert_or_assign_with_hash(dispatch_result.hash, std::forward<K>(key), std::forward<M>(mapped)).first;
+        auto [internal_iter, success] = _maps[dispatch_result.shard].do_insert_or_assign_with_hash(dispatch_result.hash, std::forward<K>(key), std::forward<M>(mapped));
+        return {this, dispatch_result.shard, internal_iter};
     }
 
     template <class K,
