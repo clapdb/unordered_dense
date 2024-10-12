@@ -1677,10 +1677,10 @@ public:
     }
 private:
     template <class... Args>
-    auto emplace_with_hash(uint64_t hash, Key&& key, Args&&... args) -> std::pair<iterator, bool> {
+    auto emplace_with_hash(uint64_t hash, Key&& the_key, Args&&... args) -> std::pair<iterator, bool> {
         // we have to instantiate the value_type to be able to access the key.
         // 1. emplace_back the object so it is constructed. 2. If the key is already there, pop it later in the loop.
-        m_values.emplace_back(std::forward<Key>(key), std::forward<Args>(args)...);
+        auto& key = get_key(m_values.emplace_back(std::forward<Key>(the_key), std::forward<Args>(args)...));
 
         // auto& key = get_key(m_values.emplace_back(std::forward<Args>(args)...));
         // auto hash = mixed_hash(key);
