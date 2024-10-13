@@ -54,4 +54,24 @@ TEST_CASE("insert_or_assign") {
     REQUIRE(map.size() == 3);
     map.insert_or_assign("a", 4ULL);
     REQUIRE(map.size() == 3);
+    std::string a_val{"3"};
+    map.insert_or_assign(a_val, 10ULL);
+    REQUIRE(map.size() == 4);
+    // REQUIRE(map["3"] == 10ULL);
 }
+
+TEST_CASE("emplace") {
+    ankerl::unordered_dense::sharding_map<std::string, uint64_t> map;
+    map.emplace("a", 1ULL);
+    REQUIRE(map.size() == 1);
+
+    // try emplace with set
+    ankerl::unordered_dense::sharding_set<std::string> set;
+    set.emplace("a");
+    REQUIRE(set.size() == 1);
+    set.emplace(std::string{"b"});
+    REQUIRE(set.size() == 2);
+    std::string c_val{"c"};
+    set.emplace(std::move(c_val));
+    REQUIRE(set.size() == 3);
+}   

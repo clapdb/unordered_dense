@@ -380,43 +380,49 @@ private:
     template<class... Args>
     auto emplace(Key&& key, Args&&... args) -> std::pair<iterator, bool> {
         auto dispatch_result = dispatch(key);
-        return _maps[dispatch_result.shard].emplace_with_hash(
+        auto [internal_iter, success] = _maps[dispatch_result.shard].emplace_with_hash(
             dispatch_result.hash, std::forward<Key>(key), std::forward<Args>(args)...);
+        return {iterator(this, dispatch_result.shard, internal_iter), success};
     }
 
     template<class... Args>
     auto emplace_hint(const_iterator /*hint*/, Key&& key, Args&&... args) -> iterator {
         auto dispatch_result = dispatch(key);
-        return _maps[dispatch_result.shard].emplace_with_hash(
+        auto [internal_iter, success] = _maps[dispatch_result.shard].emplace_with_hash(
             dispatch_result.hash, std::forward<Key>(key), std::forward<Args>(args)...);
+        return {this, dispatch_result.shard, internal_iter};
     }
 
     template<class... Args, typename Q = T, std::enable_if_t<is_map_v<Q>, bool> = true>
     auto try_emplace(Key const& key, Args&&... args) -> std::pair<iterator, bool> {
         auto dispatch_result = dispatch(key);
-        return _maps[dispatch_result.shard].do_try_emplace_with_hash(
+        auto [internal_iter, success] = _maps[dispatch_result.shard].do_try_emplace_with_hash(
             dispatch_result.hash, key, std::forward<Args>(args)...);
+        return {iterator(this, dispatch_result.shard, internal_iter), success};
     }
 
     template<class... Args, typename Q = T, std::enable_if_t<is_map_v<Q>, bool> = true>
     auto try_emplace(Key&& key, Args&&... args) -> std::pair<iterator, bool> {
         auto dispatch_result = dispatch(key);
-        return _maps[dispatch_result.shard].do_try_emplace_with_hash(
+        auto [internal_iter, success] = _maps[dispatch_result.shard].do_try_emplace_with_hash(
             dispatch_result.hash, std::forward<Key>(key), std::forward<Args>(args)...);
+        return {iterator(this, dispatch_result.shard, internal_iter), success};
     }
 
     template<class... Args, typename Q = T, std::enable_if_t<is_map_v<Q>, bool> = true>
     auto try_emplace(const_iterator /*hint*/, Key const& key, Args&&... args) -> iterator {
         auto dispatch_result = dispatch(key);
-        return _maps[dispatch_result.shard].do_try_emplace_with_hash(
+        auto [internal_iter, success] = _maps[dispatch_result.shard].do_try_emplace_with_hash(
             dispatch_result.hash, key, std::forward<Args>(args)...);
+        return {this, dispatch_result.shard, internal_iter};
     }
 
     template<class... Args, typename Q = T, std::enable_if_t<is_map_v<Q>, bool> = true>
     auto try_emplace(const_iterator /*hint*/, Key&& key, Args&&... args) -> iterator {
         auto dispatch_result = dispatch(key);
-        return _maps[dispatch_result.shard].do_try_emplace_with_hash(
+        auto [internal_iter, success] = _maps[dispatch_result.shard].do_try_emplace_with_hash(
             dispatch_result.hash, std::move<Key>(key), std::forward<Args>(args)...);
+        return {this, dispatch_result.shard, internal_iter};
     }
 
     template <
@@ -429,8 +435,9 @@ private:
                          bool> = true>
     auto try_emplace(K&& key, Args&&... args) -> std::pair<iterator, bool> {
         auto dispatch_result = dispatch(key);
-        return _maps[dispatch_result.shard].do_try_emplace_with_hash(
+        auto [internal_iter, success] = _maps[dispatch_result.shard].do_try_emplace_with_hash(
             dispatch_result.hash, std::forward<K>(key), std::forward<Args>(args)...);
+        return {iterator(this, dispatch_result.shard, internal_iter), success};
     }
 
     template <
@@ -443,8 +450,9 @@ private:
                          bool> = true>
     auto try_emplace(const_iterator /*hint*/, K&& key, Args&&... args) -> iterator {
         auto dispatch_result = dispatch(key);
-        return _maps[dispatch_result.shard].do_try_emplace_with_hash(
+        auto [internal_iter, success] = _maps[dispatch_result.shard].do_try_emplace_with_hash(
             dispatch_result.hash, std::forward<K>(key), std::forward<Args>(args)...);
+        return {this, dispatch_result.shard, internal_iter};
     }
 
             
