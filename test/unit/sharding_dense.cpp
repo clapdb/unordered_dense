@@ -48,9 +48,10 @@ TEST_CASE("insert_more") {
 TEST_CASE("insert_or_assign") {
     ankerl::unordered_dense::sharding_map<std::string, uint64_t> map;
     map.insert_or_assign("a", 1ULL);
-    // map.insert_or_assign("b", 2);
-    // map.insert_or_assign("c", 3);
-    // REQUIRE(map.size() == 3);
-    // map.insert_or_assign("a", 4);
-    // REQUIRE(map.size() == 3);
+
+    map.insert_or_assign("b", 2ULL);
+    map.insert_or_assign("c", 3ULL);
+    REQUIRE(map.size() == 3);
+    map.insert_or_assign("a", 4ULL);
+    REQUIRE(map.size() == 3);
 }

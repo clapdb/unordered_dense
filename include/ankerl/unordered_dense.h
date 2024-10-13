@@ -1102,7 +1102,7 @@ private:
 
     template <class K, class M>
     auto do_insert_or_assign_with_hash(uint64_t hash, K&& key, M&& mapped) -> std::pair<iterator, bool> {
-        auto it_isinserted = try_emplace_with_hash(hash, std::forward<K>(key), std::forward<M>(mapped));
+        auto it_isinserted = do_try_emplace_with_hash(hash, std::forward<K>(key), std::forward<M>(mapped));
         if (!it_isinserted.second) {
             it_isinserted.first->second = std::forward<M>(mapped);
         }
