@@ -74,4 +74,16 @@ TEST_CASE("emplace") {
     std::string c_val{"c"};
     set.emplace(std::move(c_val));
     REQUIRE(set.size() == 3);
-}   
+}
+
+TEST_CASE("try_emplace") {
+    ankerl::unordered_dense::sharding_map<std::string, uint64_t> map;
+    map.try_emplace("a", 1ULL);
+    REQUIRE(map.size() == 1);
+    map.try_emplace("b", 2ULL);
+    REQUIRE(map.size() == 2);
+    map.try_emplace("a", 3ULL);
+    REQUIRE(map.size() == 2);
+    map.try_emplace(map.cend(), std::string{"c"}, 4ULL);
+    map.try_emplace("a", 3ULL);
+}
