@@ -455,10 +455,293 @@ private:
         return {this, dispatch_result.shard, internal_iter};
     }
 
+
+    // erase a single iterator
+    auto erase(iterator it) -> iterator {
+        assert(it._table == this);
+        return iterator(this, it._shard, _maps[it._shard].erase(it._it));
+    }
             
+    auto extract(iterator it) -> value_type {
+        assert(it._table == this);
+        return _maps[it._shard].extract(it._it);
+    }
 
+    // erase a range of elements
+    auto erase(const_iterator first, const_iterator last) -> iterator {
+        assert(first._table == this);
+        assert(last._table == this);
+        assert(last._shard >= first._shard);
+        if (first._shard == last._shard) {
+            return iterator(this, first._shard, _maps[first._shard].erase(first._it, last._it));
+        }
+        // erase last._shard
+        auto ret = _maps[last._shard].erase(_maps[last._shard].begin(), last._it);
+        // erase first._shard
+        ret = _maps[first._shard].erase(first._it, _maps[first._shard].end());
+        // clear the shards in between
+        for (auto idx = first._shard + 1; idx < last._shard; ++idx) {
+            _maps[idx].clear();
+        }
+        return iterator(this, first._shard, ret);
+    }
+
+    auto erase(const Key& key) -> size_t {
+        auto dispatch_result = dispatch(key);
+        // every low probability function, just dispatch, no need to avoid duplicated hashing call.
+        return _maps[dispatch_result.shard].erase(key);
+    }
+
+    auto extract(const Key& key) -> std::optional<value_type> {
+        auto dispatch_result = dispatch(key);
+        // every low probability function, just dispatch, no need to avoid duplicated hashing call.
+        return _maps[dispatch_result.shard].extract(key);
+    }
+
+    template <class K,
+              typename H = Hash,
+              typename KE = keyEqual,
+              std::enable_if_t<is_transparent_v<H, KE>, bool> = true>
+    auto erase(K&& key) -> size_t {
+        auto dispatch_result = dispatch(key);
+        return _maps[dispatch_result.shard].erase(std::forward<K>(key));
+    }
+
+    template <class K,
+              typename H = Hash,
+              typename KE = keyEqual,
+              std::enable_if_t<is_transparent_v<H, KE>, bool> = true>
+    auto extract(K&& key) -> std::optional<value_type> {
+        auto dispatch_result = dispatch(key);
+        return _maps[dispatch_result.shard].extract(std::forward<K>(key));
+    }
+
+    void swap(horizontal_sharded_table& other) noexcept(noexcept(std::is_nothrow_swappable_v<value_container_type> &&
+                                                      std::is_nothrow_swappable_v<Hash> && std::is_nothrow_swappable_v<keyEqual>)) {
+        using std::swap;
+        swap(other, *this);
+    }   
+
+    // lookup
+    template <typename Q = T, std::enable_if_t<is_map_v<Q>, bool> = true>
+    auto at(const Key& key) -> Q& {
+        auto dispatch_result = dispatch(key);
+        return _maps[dispatch_result.shard].do_at_with_hash(dispatch_result.hash, key);
+    }
+
+    template<typename K,
+             typename Q = T,
+             typename H = Hash,
+             typename KE = keyEqual,
+             std::enable_if_t<is_map_v<Q> && is_transparent_v<H, KE>, bool> = true>
+    auto at(K const& key) -> Q& {
+        auto dispatch_result = dispatch(key);
+        return _maps[dispatch_result.shard].do_at_with_hash(dispatch_result.hash, key);
+    }
+
+    template <typename Q = T, std::enable_if_t<is_map_v<Q>, bool> = true>
+    auto at(const Key& key) const -> Q const& {
+        auto dispatch_result = dispatch(key);
+        return _maps[dispatch_result.shard].do_at_with_hash(dispatch_result.hash, key);
+    }
+
+    template<typename K,
+             typename Q = T,
+             typename H = Hash,
+             typename KE = keyEqual,
+             std::enable_if_t<is_map_v<Q> && is_transparent_v<H, KE>, bool> = true>
+    auto at(K const& key) const -> Q const& {
+        auto dispatch_result = dispatch(key);
+        return _maps[dispatch_result.shard].do_at_with_hash(dispatch_result.hash, key);
+    }   
+
+    template <typename Q = T, std::enable_if_t<is_map_v<Q>, bool> = true>
+    auto operator[](Key const& key) -> Q& {
+        auto dispatch_result = dispatch(key);
+        return _maps[dispatch_result.shard].try_emplace_with_hash(dispatch_result.hash, key).first->second;
+    }
+
+    template <typename Q = T, std::enable_if_t<is_map_v<Q>, bool> = true>
+    auto operator[](Key&& key) -> Q& {
+        auto dispatch_result = dispatch(key);
+        return _maps[dispatch_result.shard].try_emplace_with_hash(dispatch_result.hash, std::move(key)).first->second;
+    }
+
+    template<typename K,
+             typename Q = T,
+             typename H = Hash,
+             typename KE = keyEqual,
+             std::enable_if_t<is_map_v<Q> && is_transparent_v<H, KE>, bool> = true>
+    auto operator[](K&& key) -> Q& {
+        auto dispatch_result = dispatch(key);
+        return _maps[dispatch_result.shard].try_emplace_with_hash(dispatch_result.hash, std::forward<K>(key)).first->second;
+    }
+
+    auto count(Key const& key) const -> size_t {
+        auto dispatch_result = dispatch(key);
+        return _maps[dispatch_result.shard].do_find_with_hash(dispatch_result.hash, key) == _maps[dispatch_result.shard].end()
+                   ? 0
+                   : 1;
+    }
+
+    template <class K,
+              typename H = Hash,
+              typename KE = keyEqual,
+              std::enable_if_t<is_transparent_v<H, KE>, bool> = true>
+    auto count(K const& key) const -> size_t {
+        auto dispatch_result = dispatch(key);
+        return _maps[dispatch_result.shard].do_find_with_hash(dispatch_result.hash, key) == _maps[dispatch_result.shard].end()
+                   ? 0
+                   : 1;
+    }
+
+    auto find(Key const& key) -> iterator {
+        auto dispatch_result = dispatch(key);
+        return iterator(
+            this, dispatch_result.shard, _maps[dispatch_result.shard].do_find_with_hash(dispatch_result.hash, key));
+    }
+
+    auto find(Key const& key) const -> const_iterator {
+        auto dispatch_result = dispatch(key);
+        return const_iterator(
+            this, dispatch_result.shard, _maps[dispatch_result.shard].do_find_with_hash(dispatch_result.hash, key));
+    }
+
+    template <class K,
+              typename H = Hash,
+              typename KE = keyEqual,
+              std::enable_if_t<is_transparent_v<H, KE>, bool> = true>
+    auto find(K const& key) -> iterator {
+        auto dispatch_result = dispatch(key);
+        return iterator(this, dispatch_result.shard, _maps[dispatch_result.shard].do_find_with_hash(dispatch_result.hash, key));
+    }
+
+    template <class K,
+              typename H = Hash,
+              typename KE = keyEqual,
+              std::enable_if_t<is_transparent_v<H, KE>, bool> = true>
+    auto find(K const& key) const -> const_iterator {
+        auto dispatch_result = dispatch(key);
+        return const_iterator(this, dispatch_result.shard, _maps[dispatch_result.shard].do_find_with_hash(dispatch_result.hash, key));
+    }
+
+    auto contains(Key const& key) const -> bool {
+        return find(key) != end();
+    }
+
+    template <class K,
+              typename H = Hash,
+              typename KE = keyEqual,
+              std::enable_if_t<is_transparent_v<H, KE>, bool> = true>
+    auto contains(K const& key) const -> bool {
+        return find(key) != end();
+    }
+
+    auto equal_range(Key const& key) -> std::pair<iterator, iterator> {
+        auto it = find(key);
+        return {it, it == end() ? end() : it + 1};
+    }
+
+    auto equal_range(const Key& key) const -> std::pair<const_iterator, const_iterator> {
+        auto it = find(key);
+        return {it, it == end() ? end() : it + 1};
+    }
+
+    template <class K,
+              typename H = Hash,
+              typename KE = keyEqual,
+              std::enable_if_t<is_transparent_v<H, KE>, bool> = true>
+    auto equal_range(K const& key) -> std::pair<iterator, iterator> {
+        auto it = find(key);
+        return {it, it == end() ? end() : it + 1};
+    }
+
+    template <class K,
+              typename H = Hash,
+              typename KE = keyEqual,
+              std::enable_if_t<is_transparent_v<H, KE>, bool> = true>
+    auto equal_range(K const& key) const -> std::pair<const_iterator, const_iterator> {
+        auto it = find(key);
+        return {it, it == end() ? end() : it + 1};
+    }
+
+
+    // bucket interface ////////
+    // because the bucket interface is from std::unordered_map
+    auto bucket_count() const noexcept -> size_t {
+        // get accumulated size of all shards
+    return std::accumulate(_maps.begin(), _maps.end(), size_t(0),
+                           [](size_t acc, const auto& map) { return acc + map.bucket_count(); });
+    }
+
+    auto bucket_count(uint32_t shard) const noexcept -> size_t {
+        return _maps[shard].bucket_count();
+    }
+
+    static constexpr auto max_bucket_count() noexcept -> size_t {
+        return internal_table::max_size();
+    }
+
+    // hash policy ////////
+    [[nodiscard]] auto load_factor() const -> float {
+        return bucket_count() ? static_cast<float>(size()) / static_cast<float>(bucket_count()) : 0.0F;
+    }
+
+    [[nodiscard]] auto load_factor(uint32_t shard) const -> float {
+        return _maps[shard].load_factor();
+    }
+
+    [[nodiscard]] auto max_load_factor() const -> std::array<float, Shards> {
+        // get max_load_factor from all shards
+        std::array<float, Shards> ret;
+        std::transform(_maps.begin(), _maps.end(), ret.begin(), [](const auto& map) {
+            return map.max_load_factor();
+        });
+        return ret;
+    }
+
+    [[nodiscard]] auto max_load_factor(uint32_t shard) const -> float {
+        return _maps[shard].max_load_factor();
+    }
+
+    void max_load_factor(uint32_t shard, float ml) {
+        _maps[shard].max_load_factor(ml);
+    }
+
+    void rehash(uint32_t shard, size_t count) {
+        _maps[shard].rehash(count);
+    }
+
+    void reserve(uint32_t shard, size_t count) {
+        _maps[shard].reserve(count);
+    }
+
+    // observers ////////
+    auto hash_function() const -> Hash {
+        return _maps[0].hash_function();
+    }
+
+    auto key_eq() const -> keyEqual {
+        return _maps[0].key_eq();
+    }
     
+    // nonstandard API: expose the underlying values container
+    [[nodiscard]] auto values(uint32_t shard) const noexcept -> value_container_type const& {
+        return _maps[shard].values();
+    }
 
+    friend auto operator==(horizontal_sharded_table const& a, horizontal_sharded_table const& b) -> bool {
+        for (uint32_t shard = 0; shard < Shards; ++shard) {
+            if (a._maps[shard] != b._maps[shard]) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    friend auto operator!=(horizontal_sharded_table const& a, horizontal_sharded_table const& b) -> bool {
+        return a._maps != b._maps;
+    }
 }; // class horizontal_sharded_table
 
 }  // namespace detail
