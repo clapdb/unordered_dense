@@ -421,7 +421,7 @@ private:
     auto try_emplace(const_iterator /*hint*/, Key&& key, Args&&... args) -> iterator {
         auto dispatch_result = dispatch(key);
         auto [internal_iter, success] = _maps[dispatch_result.shard].do_try_emplace_with_hash(
-            dispatch_result.hash, std::move<Key>(key), std::forward<Args>(args)...);
+            dispatch_result.hash, std::forward<Key>(key), std::forward<Args>(args)...);
         return {this, dispatch_result.shard, internal_iter};
     }
 
