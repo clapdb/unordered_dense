@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <numeric>
 #include <type_traits>
+#include <cassert>
 
 namespace ankerl::unordered_dense {
 
@@ -712,8 +713,11 @@ private:
         _maps[shard].rehash(count);
     }
 
-    void reserve(uint32_t shard, size_t count) {
-        _maps[shard].reserve(count);
+    void reserve(uint32_t size) {
+        uint32_t size_per_shard = size / Shards;
+        for (auto& map : _maps) {
+            map.reserve(size_per_shard);
+        }
     }
 
     // observers ////////
