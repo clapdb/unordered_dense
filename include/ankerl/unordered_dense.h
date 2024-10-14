@@ -1227,6 +1227,11 @@ private:
     }
 
     template <typename K>
+    auto do_find_with_hash(uint64_t hash, K const& key) const -> const_iterator {
+        return const_cast<table*>(this)->do_find_with_hash(hash, key); // NOLINT(cppcoreguidelines-pro-type-const-cast)
+    }
+
+    template <typename K>
     auto do_find(K const& key) -> iterator {
         if (ANKERL_UNORDERED_DENSE_UNLIKELY(empty())) {
             return end();
