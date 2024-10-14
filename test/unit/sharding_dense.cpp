@@ -1,6 +1,7 @@
 #include <sharding_dense.h>
 
 #include <string>
+#include <fmt/core.h>
 
 #include <doctest.h>
 
@@ -19,6 +20,7 @@ TEST_CASE("insert") {
 
     map.insert(map.cend(), {"end", 4});
     REQUIRE(map.size() == 5);
+    CHECK_EQ(map.find("google"), map.cend());
 
     ankerl::unordered_dense::sharding_set<std::string> set2;
     set2.insert("hi");
@@ -29,6 +31,8 @@ TEST_CASE("insert") {
 
     set2.insert(set2.cend(), "end");
     REQUIRE(set2.size() == 3);
+    auto it2 = set2.find("google");
+    REQUIRE(it2 == set2.cend());
 }
 
 TEST_CASE("insert_more") {
@@ -37,6 +41,15 @@ TEST_CASE("insert_more") {
     auto to_insert = std::vector<std::pair<std::string, uint64_t>>{{"a", 1}, {"b", 2}, {"c", 3}};
     map.insert(to_insert.begin(), to_insert.end());
     REQUIRE(map.size() == 3);
+    auto a_it = map.find("a");
+    REQUIRE(a_it != map.cend());
+    CHECK_EQ(a_it->second, 1);
+    auto b_it = map.find("b");
+    REQUIRE(b_it != map.cend());
+    CHECK_EQ(b_it->second, 2);
+    auto c_it = map.find("c");
+    REQUIRE(c_it != map.cend());
+    CHECK_EQ(c_it->second, 3);
 
     ankerl::unordered_dense::sharding_set<std::string> set2;
     std::vector<std::string> to_insert_set{"a", "b", "c"};
@@ -86,4 +99,9 @@ TEST_CASE("try_emplace") {
     REQUIRE(map.size() == 2);
     map.try_emplace(map.cend(), std::string{"c"}, 4ULL);
     map.try_emplace("a", 3ULL);
+    REQUIRE(map.size() == 3);
+    auto it = map.find("a");
+    REQUIRE(it != map.cend());
+    CHECK_EQ(it->second, 1ULL);
+    REQUIRE(map["a"] == 1ULL);
 }

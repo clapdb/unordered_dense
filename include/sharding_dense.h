@@ -216,15 +216,15 @@ private:
     }
 
     auto end() -> iterator {
-        return iterator(this, Shards, _maps[Shards - 1].end());
+        return iterator(this, Shards - 1, _maps[Shards - 1].end());
     }
 
     auto end() const -> const_iterator {
-        return const_iterator(this, Shards, _maps[Shards - 1].end());
+        return const_iterator(this, Shards - 1, _maps[Shards - 1].end());
     }
 
     auto cend() const -> const_iterator {
-        return const_iterator(this, Shards, _maps[Shards - 1].end());
+        return const_iterator(this, Shards - 1, _maps[Shards - 1].end());
     }
 
     [[nodiscard]] auto empty() const -> bool {
@@ -558,13 +558,13 @@ private:
     template <typename Q = T, std::enable_if_t<is_map_v<Q>, bool> = true>
     auto operator[](Key const& key) -> Q& {
         auto dispatch_result = dispatch(key);
-        return _maps[dispatch_result.shard].try_emplace_with_hash(dispatch_result.hash, key).first->second;
+        return _maps[dispatch_result.shard].do_try_emplace_with_hash(dispatch_result.hash, key).first->second;
     }
 
     template <typename Q = T, std::enable_if_t<is_map_v<Q>, bool> = true>
     auto operator[](Key&& key) -> Q& {
         auto dispatch_result = dispatch(key);
-        return _maps[dispatch_result.shard].try_emplace_with_hash(dispatch_result.hash, std::move(key)).first->second;
+        return _maps[dispatch_result.shard].do_try_emplace_with_hash(dispatch_result.hash, std::move(key)).first->second;
     }
 
     template<typename K,
@@ -574,7 +574,7 @@ private:
              std::enable_if_t<is_map_v<Q> && is_transparent_v<H, KE>, bool> = true>
     auto operator[](K&& key) -> Q& {
         auto dispatch_result = dispatch(key);
-        return _maps[dispatch_result.shard].try_emplace_with_hash(dispatch_result.hash, std::forward<K>(key)).first->second;
+        return _maps[dispatch_result.shard].do_try_emplace_with_hash(dispatch_result.hash, std::forward<K>(key)).first->second;
     }
 
     auto count(Key const& key) const -> size_t {
