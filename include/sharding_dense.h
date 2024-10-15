@@ -12,13 +12,14 @@ namespace ankerl::unordered_dense {
 
 namespace detail {
 
-template<uint32_t Shards>
+template <uint32_t Shards>
 class shard_dispatcher {
 public:
     // TODO(leo): implement a better hash dispatcher to make shards more balanced working with internal_table's hash policy
     // FIXME
     auto operator()(uint64_t hash) const -> uint32_t {
-        return hash % Shards;
+        static_assert(Shards > 0 && (Shards & (Shards - 1)) == 0, "Shards must be power of 2");
+        return (hash >> 8UL) & (Shards - 1);
     }
 };
 
