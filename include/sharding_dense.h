@@ -7,6 +7,7 @@
 #include <numeric>
 #include <type_traits>
 #include <cassert>
+#include <iostream>
 
 namespace ankerl::unordered_dense {
 
@@ -43,6 +44,7 @@ class horizontal_sharded_table {
     using reference = typename internal_table::reference;
     using const_reference = typename internal_table::const_reference;
     using pointer = typename internal_table::pointer;
+    using const_pointer = typename internal_table::const_pointer;
 
     /**
      * wrap internal_table::iterator to add shard index
@@ -59,9 +61,23 @@ class horizontal_sharded_table {
         using internal_iterator = std::conditional_t<IsConst, typename internal_table::const_iterator, typename internal_table::iterator>;
         using table_type = std::conditional_t<IsConst, const horizontal_sharded_table, horizontal_sharded_table>;
         using difference_type = typename internal_table::value_container_type::difference_type;
+        using iter_reference = std::conditional_t<IsConst || not is_map_v<T>, const_reference, reference>;
+        using iter_pointer = std::conditional_t<IsConst || not is_map_v<T>, const_pointer, pointer>;
         table_type * _table = nullptr;
         uint32_t _shard = 0;
         internal_iterator _it = {};
+    private:
+        [[nodiscard]] inline bool is_current_shard_end() const {
+            return _it == _table->_maps[_shard].end();
+        }
+        [[nodiscard]] inline uint32_t next_available_shard() const {
+            uint32_t next_shard = _shard + 1;
+            // seek to the next non-empty shard, if no next available shard, return Shards
+            while(next_shard < Shards && _table->_maps[next_shard].empty()) {
+                ++next_shard;
+            }
+            return next_shard;
+        }
 
     public:
         iteratorT(table_type * table, uint32_t shard, internal_iterator it) : _table(table), _shard(shard), _it(std::move(it)) {}
@@ -97,9 +113,16 @@ class horizontal_sharded_table {
         }
 
         constexpr auto operator++() noexcept -> iteratorT& {
-            if (++_it == _table->_maps[_shard].end()) {
-                ++_shard;
-                if (_shard < Shards) {
+            // not check current is shard's end, just move
+            ++_it;
+            if (ANKERL_UNORDERED_DENSE_UNLIKELY(is_current_shard_end())) {
+                auto next_shard = next_available_shard();
+                if (next_shard == Shards) {
+                    // out of range, just return the end iterator
+                    _shard = Shards - 1;
+                    _it = _table->_maps[_shard].end();
+                } else {
+                    _shard = next_shard;
                     _it = _table->_maps[_shard].begin();
                 }
             }
@@ -112,30 +135,33 @@ class horizontal_sharded_table {
             return tmp;
         }
         
-        constexpr auto operator+(difference_type n) const noexcept -> iteratorT {
-            difference_type distance_to_end_in_current_shard = _table->_maps[_shard].end() - _it;
-            if (distance_to_end_in_current_shard > n) { // in the same shard
-                return iteratorT(_table, _shard, _it + n);
-            } else if (_shard == Shards - 1) { // already in the last shard
-                // out of range or end, just return end
-                return iteratorT(_table, _shard, std::move(_table->_maps[_shard].end()));
-            } else { // in next shard
-                // use recursive call to move to the next shard
-                return iteratorT(_table, _shard + 1, _table->_maps[_shard + 1].begin()) + (n - distance_to_end_in_current_shard);
-            }
-        }
+        constexpr auto operator+(difference_type n) noexcept -> iteratorT {
+            // difference_type distance_to_end_in_current_shard = _table->_maps[_shard].end() - _it;
+            // auto it = _it;
+            // auto target_shard = _shard;
+            // difference_type switch_shard = 0;
 
-        constexpr auto operator-(difference_type n) const noexcept -> iteratorT {
-            difference_type distance_to_begin_in_current_shard = _it - _table->_maps[_shard].begin();
-            if (distance_to_begin_in_current_shard > n) {
-                return iteratorT(_table, _shard, _it - n);
-            } else if (_shard == 0) {
-                // out of range or begin, just return begin
-                return {_table, 0, _table->_map[0]->begin()};
-            } else { // in previous shard
-                // use recursive call to move to the previous shard
-                return iterator(_table, _shard - 1, _table->_maps[_shard - 1].end()) - (n - distance_to_begin_in_current_shard);
+            // while (n >= distance_to_end_in_current_shard) {
+            //     if (ANKERL_UNORDERED_DENSE_UNLIKELY(_shard == Shards - 1)) {
+            //         // out of range
+            //         return _table->end();
+            //     }
+            //     n -= distance_to_end_in_current_shard;
+            //     it = _table->_maps[++target_shard].begin();
+            //     // update distance to end in next shard
+            //     // size() is fastest way to get the distance to end in next shard
+            //     distance_to_end_in_current_shard = static_cast<difference_type>(_table->_maps[target_shard].size());
+            //     switch_shard = 1;
+            // }
+            // // the target is in the current shard
+            // return iteratorT(_table, _shard, it + (n - switch_shard));
+            iteratorT new_iter{*this};
+            for (difference_type i = 0; i < n; ++i) {
+                ++new_iter;
+                // std::cout << "new_iter key: " << *(new_iter._it->first) << std::endl;
+                // std::cout << "new_iter value: " << new_iter._it->second << std::endl;
             }
+            return new_iter;
         }
 
         template<bool OtherIsConst>
@@ -160,11 +186,19 @@ class horizontal_sharded_table {
             return -distance;
         }
 
-        constexpr auto operator*() const noexcept -> std::conditional_t<IsConst, const_reference, reference> {
-            return *_it;
+        constexpr auto operator*() noexcept -> iter_reference {
+            return _it.operator*();
         }
 
-        constexpr auto operator->() const noexcept -> pointer {
+        constexpr auto operator*() const noexcept -> const_reference {
+            return _it.operator*();
+        }
+
+        constexpr auto operator->() noexcept -> iter_pointer {
+            return _it.operator->();
+        }
+
+        constexpr auto operator->() const noexcept -> const_pointer {
             return _it.operator->();
         }
 
@@ -177,7 +211,10 @@ class horizontal_sharded_table {
                 return _it == other._it;
             }
             // if both of them are end, they are equal, else they are not
-            return (_it == _table->_maps[_shard].end() && other._it == _table->_maps[other._shard].end());
+            // return (_it == _table->_maps[_shard].end() && other._it == _table->_maps[other._shard].end());
+            bool this_is_end = (_it == _table->_maps[_shard].end());
+            bool other_is_end = (other._it == other._table->_maps[other._shard].end());
+            return this_is_end && other_is_end;
         }
 
         template<bool OtherIsConst>
@@ -757,15 +794,81 @@ ANKERL_UNORDERED_DENSE_EXPORT template <class Key,
                                         class KeyEqual = std::equal_to<Key>,
                                         class AllocatorOrContainer = std::allocator<std::pair<Key, T>>,
                                         class Bucket = bucket_type::standard,
-                                        class BucketContainer = detail::default_container_t>
-using sharding_map = detail::horizontal_sharded_table<Key, T, Hash, KeyEqual, AllocatorOrContainer, Bucket, BucketContainer, false, 8, detail::shard_dispatcher<8>>;
+                                        class BucketContainer = detail::default_container_t,
+                                        uint32_t Shard = 8,
+                                        template <typename, typename> class ValueContainer = std::vector>
+using sharding_map = detail::horizontal_sharded_table<Key,
+                                                      T,
+                                                      Hash,
+                                                      KeyEqual,
+                                                      AllocatorOrContainer,
+                                                      Bucket,
+                                                      BucketContainer,
+                                                      false,
+                                                      Shard,
+                                                      detail::shard_dispatcher<Shard>,
+                                                      ValueContainer>;
 
 ANKERL_UNORDERED_DENSE_EXPORT template <class Key,
-                                        class T = void,
                                         class Hash = hash<Key>,
                                         class KeyEqual = std::equal_to<Key>,
                                         class AllocatorOrContainer = std::allocator<Key>,
                                         class Bucket = bucket_type::standard,
-                                        class BucketContainer = detail::default_container_t>
-using sharding_set = detail::horizontal_sharded_table<Key, T, Hash, KeyEqual, AllocatorOrContainer, Bucket, BucketContainer, false, 8, detail::shard_dispatcher<8>>;
+                                        class BucketContainer = detail::default_container_t,
+                                        uint32_t Shard = 8,
+                                        template <typename, typename> class ValueContainer = std::vector>
+using sharding_set = detail::horizontal_sharded_table<Key,
+                                                      void,
+                                                      Hash,
+                                                      KeyEqual,
+                                                      AllocatorOrContainer,
+                                                      Bucket,
+                                                      BucketContainer,
+                                                      false,
+                                                      Shard,
+                                                      detail::shard_dispatcher<Shard>,
+                                                      ValueContainer>;
+
+// Start Generation Here
+template <class Key,
+          class T,
+          class Hash = hash<Key>,
+          class KeyEqual = std::equal_to<Key>,
+          class AllocatorOrContainer = std::allocator<std::pair<Key, T>>,
+          class Bucket = bucket_type::standard,
+          class BucketContainer = detail::default_container_t,
+          uint32_t Shard = 8,
+          template <typename, typename> class ValueContainer = std::vector>
+using segment_sharding_map = detail::horizontal_sharded_table<Key,
+                                                              T,
+                                                              Hash,
+                                                              KeyEqual,
+                                                              AllocatorOrContainer,
+                                                              Bucket,
+                                                              BucketContainer,
+                                                              true,
+                                                              Shard,
+                                                              detail::shard_dispatcher<Shard>,
+                                                              ValueContainer>;
+    // Start Generation Here
+    template <class Key,
+              class Hash = hash<Key>,
+              class KeyEqual = std::equal_to<Key>,
+              class AllocatorOrContainer = std::allocator<Key>,
+              class Bucket = bucket_type::standard,
+              class BucketContainer = detail::default_container_t,
+              uint32_t Shard = 8,
+              template <typename, typename> class ValueContainer = std::vector>
+    using segment_sharding_set = detail::horizontal_sharded_table<Key,
+                                                                  void,
+                                                                  Hash,
+                                                                  KeyEqual,
+                                                                  AllocatorOrContainer,
+                                                                  Bucket,
+                                                                  BucketContainer,
+                                                                  true,
+                                                                  Shard,
+                                                                  detail::shard_dispatcher<Shard>,
+                                                                  ValueContainer>;
+
 }  // namespace ankerl::unordered_dense
