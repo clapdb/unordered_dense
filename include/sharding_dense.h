@@ -212,7 +212,8 @@ class horizontal_sharded_table {
             }
             // if both of them are end, they are equal, else they are not
             // return (_it == _table->_maps[_shard].end() && other._it == _table->_maps[other._shard].end());
-            bool this_is_end = (_it == _table->_maps[_shard].end());
+            auto current_end = _table->_maps[_shard].end();
+            bool this_is_end = (_it == current_end);
             bool other_is_end = (other._it == other._table->_maps[other._shard].end());
             return this_is_end && other_is_end;
         }

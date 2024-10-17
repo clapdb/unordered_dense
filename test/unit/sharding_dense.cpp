@@ -387,7 +387,8 @@ void set_test_equal_range() {
     set.insert("e");
     auto range = set.equal_range("a");
     REQUIRE(range.first != set.cend());
-    // REQUIRE(range.second == set.cend());
+    bool second_is_end = range.second == set.cend();
+    REQUIRE(second_is_end);
     // auto val = *range.first;
     // fmt::print("{}\n", val);
     // // CHECK_EQ(range.first, "a");
