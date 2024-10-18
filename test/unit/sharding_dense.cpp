@@ -39,9 +39,9 @@ void set_test_insert() {
 
 TEST_CASE("insert") {
     map_test_insert<ankerl::unordered_dense::sharding_map<std::string, uint64_t>>();
-    map_test_insert<ankerl::unordered_dense::segment_sharding_map<std::string, uint64_t>>();
+    map_test_insert<ankerl::unordered_dense::segmented_sharding_map<std::string, uint64_t>>();
     set_test_insert<ankerl::unordered_dense::sharding_set<std::string>>();  
-    set_test_insert<ankerl::unordered_dense::segment_sharding_set<std::string>>();
+    set_test_insert<ankerl::unordered_dense::segmented_sharding_set<std::string>>();
 }
 
 
@@ -75,9 +75,9 @@ void set_test_insert_more() {
 
 TEST_CASE("insert_more") {
     map_test_insert_more<ankerl::unordered_dense::sharding_map<std::string, uint64_t>>();
-    map_test_insert_more<ankerl::unordered_dense::segment_sharding_map<std::string, uint64_t>>();
+    map_test_insert_more<ankerl::unordered_dense::segmented_sharding_map<std::string, uint64_t>>();
     set_test_insert_more<ankerl::unordered_dense::sharding_set<std::string>>();
-    set_test_insert_more<ankerl::unordered_dense::segment_sharding_set<std::string>>();
+    set_test_insert_more<ankerl::unordered_dense::segmented_sharding_set<std::string>>();
 }
 
 
@@ -100,7 +100,7 @@ void map_test_insert_or_assign() {
 
 TEST_CASE("insert_or_assign") {
     map_test_insert_or_assign<ankerl::unordered_dense::sharding_map<std::string, uint64_t>>();
-    map_test_insert_or_assign<ankerl::unordered_dense::segment_sharding_map<std::string, uint64_t>>();
+    map_test_insert_or_assign<ankerl::unordered_dense::segmented_sharding_map<std::string, uint64_t>>();
 }
 
 template<typename Map>
@@ -139,9 +139,9 @@ void set_test_emplace() {
 
 TEST_CASE("emplace") {
     map_test_emplace<ankerl::unordered_dense::sharding_map<std::string, uint64_t>>();
-    map_test_emplace<ankerl::unordered_dense::segment_sharding_map<std::string, uint64_t>>();
+    map_test_emplace<ankerl::unordered_dense::segmented_sharding_map<std::string, uint64_t>>();
     set_test_emplace<ankerl::unordered_dense::sharding_set<std::string>>();
-    set_test_emplace<ankerl::unordered_dense::segment_sharding_set<std::string>>();
+    set_test_emplace<ankerl::unordered_dense::segmented_sharding_set<std::string>>();
 }
 
 template<typename Map>
@@ -167,7 +167,7 @@ void map_test_try_emplace() {
 
 TEST_CASE("try_emplace") {
     map_test_try_emplace<ankerl::unordered_dense::sharding_map<std::string, uint64_t>>();
-    map_test_try_emplace<ankerl::unordered_dense::segment_sharding_map<std::string, uint64_t>>();
+    map_test_try_emplace<ankerl::unordered_dense::segmented_sharding_map<std::string, uint64_t>>();
     // set do not support try_emplace
 }
 
@@ -213,7 +213,7 @@ void map_test_at() {
 
 TEST_CASE("at") {
     map_test_at<ankerl::unordered_dense::sharding_map<std::string, uint64_t>>();
-    map_test_at<ankerl::unordered_dense::segment_sharding_map<std::string, uint64_t>>();
+    map_test_at<ankerl::unordered_dense::segmented_sharding_map<std::string, uint64_t>>();
     // set do not support at
 }
 
@@ -239,7 +239,7 @@ void map_test_operator_square_brackets() {
 
 TEST_CASE("operator[]") {
     map_test_operator_square_brackets<ankerl::unordered_dense::sharding_map<std::string, uint64_t>>();
-    map_test_operator_square_brackets<ankerl::unordered_dense::segment_sharding_map<std::string, uint64_t>>();
+    map_test_operator_square_brackets<ankerl::unordered_dense::segmented_sharding_map<std::string, uint64_t>>();
 }
 
 template<typename Map>
@@ -282,9 +282,9 @@ void set_test_count() {
 
 TEST_CASE("count") {
     map_test_count<ankerl::unordered_dense::sharding_map<std::string, uint64_t>>();
-    map_test_count<ankerl::unordered_dense::segment_sharding_map<std::string, uint64_t>>();
+    map_test_count<ankerl::unordered_dense::segmented_sharding_map<std::string, uint64_t>>();
     set_test_count<ankerl::unordered_dense::sharding_set<std::string>>();
-    set_test_count<ankerl::unordered_dense::segment_sharding_set<std::string>>();
+    set_test_count<ankerl::unordered_dense::segmented_sharding_set<std::string>>();
 }
 
 template<typename Map>
@@ -310,7 +310,7 @@ void map_test_find() {
 
 TEST_CASE("find") {
     map_test_find<ankerl::unordered_dense::sharding_map<std::string, uint64_t>>();
-    map_test_find<ankerl::unordered_dense::segment_sharding_map<std::string, uint64_t>>();
+    map_test_find<ankerl::unordered_dense::segmented_sharding_map<std::string, uint64_t>>();
 }
 
 template<typename Map>
@@ -355,9 +355,9 @@ void set_test_contains() {
 
 TEST_CASE("contains") {
     map_test_contains<ankerl::unordered_dense::sharding_map<std::string, uint64_t>>();
-    map_test_contains<ankerl::unordered_dense::segment_sharding_map<std::string, uint64_t>>();
+    map_test_contains<ankerl::unordered_dense::segmented_sharding_map<std::string, uint64_t>>();
     set_test_contains<ankerl::unordered_dense::sharding_set<std::string>>();
-    set_test_contains<ankerl::unordered_dense::segment_sharding_set<std::string>>();
+    set_test_contains<ankerl::unordered_dense::segmented_sharding_set<std::string>>();
 }
 
 template<typename Map>
@@ -387,37 +387,58 @@ void set_test_equal_range() {
     set.insert("e");
     auto range = set.equal_range("a");
     REQUIRE(range.first != set.cend());
-    // REQUIRE(range.second == set.cend());
-    // auto val = *range.first;
-    // fmt::print("{}\n", val);
-    // // CHECK_EQ(range.first, "a");
-    // auto range2 = set.equal_range("z");
-    // CHECK_EQ(range2.first, set.cend());
+    REQUIRE(range.second != set.cend());
+
+    auto range2 = set.equal_range("z");
+    REQUIRE(range2.first == set.cend());
+    REQUIRE(range2.second == set.cend());
 }
 
 TEST_CASE("equal_range") {
     map_test_equal_range<ankerl::unordered_dense::sharding_map<std::string, uint64_t>>();
-    map_test_equal_range<ankerl::unordered_dense::segment_sharding_map<std::string, uint64_t>>();
+    map_test_equal_range<ankerl::unordered_dense::segmented_sharding_map<std::string, uint64_t>>();
     set_test_equal_range<ankerl::unordered_dense::sharding_set<std::string>>();
-    set_test_equal_range<ankerl::unordered_dense::segment_sharding_set<std::string>>();
+    set_test_equal_range<ankerl::unordered_dense::segmented_sharding_set<std::string>>();
 }
 
-TEST_CASE("bucket_count") {
-    ankerl::unordered_dense::sharding_map<std::string, uint64_t> map;
+template<typename Map>
+void map_test_bucket_count() {
+    Map map;
     map.insert({"a", 1});
     map.insert({"b", 2});
     map.insert({"c", 3});
     map.insert({"d", 4});
     map.insert({"e", 5});
-    // the default bucket count of a internal table is 4
     CHECK_EQ(map.bucket_count(), 32);
     for (uint32_t i = 0; i < 8UL; ++i) {
         CHECK_EQ(map.bucket_count(i), 4);
     }
+}
+
+template<typename Set>
+void set_test_bucket_count() {
+    Set set;
+    set.insert("a");
+    set.insert("b");
+    set.insert("c");
+    set.insert("d");
+    set.insert("e");
+    CHECK_EQ(set.bucket_count(), 32);
+    for (uint32_t i = 0; i < 8UL; ++i) {
+        CHECK_EQ(set.bucket_count(i), 4);
+    }
+}
+
+TEST_CASE("bucket_count") {
+    map_test_bucket_count<ankerl::unordered_dense::sharding_map<std::string, uint64_t>>();
+    map_test_bucket_count<ankerl::unordered_dense::segmented_sharding_map<std::string, uint64_t>>();
+    set_test_bucket_count<ankerl::unordered_dense::sharding_set<std::string>>();
+    set_test_bucket_count<ankerl::unordered_dense::segmented_sharding_set<std::string>>();
 }   
 
-TEST_CASE("load_factor") {
-    ankerl::unordered_dense::sharding_map<std::string, uint64_t> map;
+template<typename Map>
+void map_test_load_factor() {
+    Map map;
     map.insert({"a", 1});
     map.insert({"b", 2});
     map.insert({"c", 3});
@@ -429,21 +450,59 @@ TEST_CASE("load_factor") {
     CHECK_EQ(map.load_factor(), 0.25);
 }
 
-TEST_CASE("reserve") {
-    ankerl::unordered_dense::sharding_map<std::string, uint64_t> map;
+template<typename Set>
+void set_test_load_factor() {
+    Set set;
+    set.insert("a");
+    set.insert("b");
+    set.insert("c");
+    set.insert("d");
+    set.insert("e");
+    set.insert("f");
+    set.insert("g");
+    set.insert("h");
+    CHECK_EQ(set.load_factor(), 0.25);
+}
+
+TEST_CASE("load_factor") {
+    map_test_load_factor<ankerl::unordered_dense::sharding_map<std::string, uint64_t>>();
+    map_test_load_factor<ankerl::unordered_dense::segmented_sharding_map<std::string, uint64_t>>();
+    set_test_load_factor<ankerl::unordered_dense::sharding_set<std::string>>();
+    set_test_load_factor<ankerl::unordered_dense::segmented_sharding_set<std::string>>();
+}
+
+template<typename Map>
+void map_test_reserve() {
+    Map map;
     map.reserve(128);
     CHECK_EQ(map.size(), 0);
     CHECK_EQ(map.bucket_count(), 256);
 }
 
-TEST_CASE("erase") {
-    ankerl::unordered_dense::sharding_map<std::string, uint64_t> map;
+template<typename Set>
+void set_test_reserve() {
+    Set set;
+    set.reserve(128);
+    CHECK_EQ(set.size(), 0);
+    CHECK_EQ(set.bucket_count(), 256);
+}
+
+TEST_CASE("reserve") {
+    map_test_reserve<ankerl::unordered_dense::sharding_map<std::string, uint64_t>>();
+    map_test_reserve<ankerl::unordered_dense::segmented_sharding_map<std::string, uint64_t>>();
+    set_test_reserve<ankerl::unordered_dense::sharding_set<std::string>>();
+    set_test_reserve<ankerl::unordered_dense::segmented_sharding_set<std::string>>();
+}
+
+template<typename Map>
+void map_test_erase() {
+    Map map;
     map.insert({"a", 1});
     map.insert({"b", 2});
     map.insert({"c", 3});
     map.insert({"d", 4});
     map.insert({"e", 5});
-    
+
     map.erase(map.find("a"));
     CHECK_EQ(map.size(), 4);
     CHECK_EQ(map.find("a"), map.cend());
@@ -455,10 +514,48 @@ TEST_CASE("erase") {
     map.erase(map.find("c"));
     CHECK_EQ(map.size(), 2);
     CHECK_EQ(map.find("c"), map.cend());
+
+    map.erase("z");
+    CHECK_EQ(map.size(), 2);
+    CHECK_EQ(map.find("z"), map.cend());
 }
 
-TEST_CASE("erase_range") {
-    ankerl::unordered_dense::sharding_map<std::string, uint64_t> map;
+template<typename Set>
+void set_test_erase() {
+    Set set;
+    set.insert("a");
+    set.insert("b");
+    set.insert("c");
+    set.insert("d");
+    set.insert("e");
+
+    set.erase(set.find("a"));
+    CHECK_EQ(set.size(), 4);
+    CHECK_EQ(set.find("a"), set.cend());
+    
+    set.erase("b");
+    CHECK_EQ(set.size(), 3);
+    CHECK_EQ(set.find("b"), set.cend());
+
+    set.erase(set.find("c"));
+    CHECK_EQ(set.size(), 2);
+    CHECK_EQ(set.find("c"), set.cend());
+
+    set.erase("z");
+    CHECK_EQ(set.size(), 2);
+    CHECK_EQ(set.find("z"), set.cend());
+}
+
+TEST_CASE("erase") {
+    map_test_erase<ankerl::unordered_dense::sharding_map<std::string, uint64_t>>();
+    map_test_erase<ankerl::unordered_dense::segmented_sharding_map<std::string, uint64_t>>();
+    set_test_erase<ankerl::unordered_dense::sharding_set<std::string>>();
+    set_test_erase<ankerl::unordered_dense::segmented_sharding_set<std::string>>();
+}
+
+template<typename Map>
+void map_test_erase_range() {
+    Map map;
     map.insert({"a", 1});
     map.insert({"b", 2});
     map.insert({"c", 3});
@@ -469,8 +566,29 @@ TEST_CASE("erase_range") {
     CHECK_EQ(map.size(), 0);
 }
 
-TEST_CASE("clear") {
-    ankerl::unordered_dense::sharding_map<std::string, uint64_t> map;
+template<typename Set>
+void set_test_erase_range() {
+    Set set;
+    set.insert("a");
+    set.insert("b");
+    set.insert("c");
+    set.insert("d");
+    set.insert("e");
+
+    set.erase(set.cbegin(), set.cend());
+    CHECK_EQ(set.size(), 0);
+}
+
+TEST_CASE("erase_range") {
+    map_test_erase_range<ankerl::unordered_dense::sharding_map<std::string, uint64_t>>();
+    map_test_erase_range<ankerl::unordered_dense::segmented_sharding_map<std::string, uint64_t>>();
+    set_test_erase_range<ankerl::unordered_dense::sharding_set<std::string>>();
+    set_test_erase_range<ankerl::unordered_dense::segmented_sharding_set<std::string>>();
+}
+
+template<typename Map>
+void map_test_clear() {
+    Map map;
     map.insert({"a", 1});
     map.insert({"b", 2});
     map.insert({"c", 3});
@@ -478,15 +596,35 @@ TEST_CASE("clear") {
     map.insert({"e", 5});
     map.clear();
     CHECK_EQ(map.size(), 0);
+}
+
+template<typename Set>
+void set_test_clear() {
+    Set set;
+    set.insert("a");
+    set.insert("b");
+    set.insert("c");
+    set.insert("d");
+    set.insert("e");
+    set.clear();
+    CHECK_EQ(set.size(), 0);
+}
+
+TEST_CASE("clear") {
+    map_test_clear<ankerl::unordered_dense::sharding_map<std::string, uint64_t>>();
+    map_test_clear<ankerl::unordered_dense::segmented_sharding_map<std::string, uint64_t>>();
+    set_test_clear<ankerl::unordered_dense::sharding_set<std::string>>();
+    set_test_clear<ankerl::unordered_dense::segmented_sharding_set<std::string>>();
 } 
 
-TEST_CASE("swap") {
-    ankerl::unordered_dense::sharding_map<std::string, uint64_t> map1;
+template<typename Map>
+void map_test_swap() {
+    Map map1;
     map1.insert({"a", 1});
     map1.insert({"b", 2});
     map1.insert({"c", 3});
     
-    ankerl::unordered_dense::sharding_map<std::string, uint64_t> map2;
+    Map map2;
     map2.insert({"f", 6});
     map2.insert({"g", 7});
     map2.insert({"h", 8});
@@ -498,8 +636,36 @@ TEST_CASE("swap") {
     CHECK_EQ(map2.size(), 3);
 }
 
-TEST_CASE("extract") {
-    ankerl::unordered_dense::sharding_map<std::string, uint64_t> map;
+template<typename Set>
+void set_test_swap() {
+    Set set1;
+    set1.insert("a");
+    set1.insert("b");
+    set1.insert("c");
+
+    Set set2;
+    set2.insert("f");
+    set2.insert("g");
+    set2.insert("h");
+    set2.insert("i");
+    set2.insert("j");
+
+    set1.swap(set2);
+    CHECK_EQ(set1.size(), 5);
+    CHECK_EQ(set2.size(), 3);
+}
+
+TEST_CASE("swap") {
+    map_test_swap<ankerl::unordered_dense::sharding_map<std::string, uint64_t>>();
+    map_test_swap<ankerl::unordered_dense::segmented_sharding_map<std::string, uint64_t>>();
+    set_test_swap<ankerl::unordered_dense::sharding_set<std::string>>();
+    set_test_swap<ankerl::unordered_dense::segmented_sharding_set<std::string>>();
+}
+
+
+template<typename Map>
+void map_test_extract() {
+    Map map;
     map.insert({"a", 1});
     map.insert({"b", 2});
     map.insert({"c", 3});
@@ -513,6 +679,30 @@ TEST_CASE("extract") {
     CHECK_EQ(map.size(), 4);
     CHECK_EQ(map.find("e"), map.cend());
 }
+
+template<typename Set>
+void set_test_extract() {
+    Set set;
+    set.insert("a");
+    set.insert("b");
+    set.insert("c");
+    set.insert("d");
+    set.insert("e");
+
+    auto it = set.find("e");
+    auto node = set.extract(it);
+    CHECK(node == "e");
+    CHECK_EQ(set.size(), 4);
+    CHECK_EQ(set.find("e"), set.cend());
+}
+
+TEST_CASE("extract") {
+    map_test_extract<ankerl::unordered_dense::sharding_map<std::string, uint64_t>>();
+    map_test_extract<ankerl::unordered_dense::segmented_sharding_map<std::string, uint64_t>>();
+    set_test_extract<ankerl::unordered_dense::sharding_set<std::string>>();
+    set_test_extract<ankerl::unordered_dense::segmented_sharding_set<std::string>>();
+}
+
 template<typename Map>
 void map_test_for_loop_all() {
     Map map;
@@ -558,7 +748,7 @@ void set_test_for_loop_all() {
 
 TEST_CASE("for-loop-all") {
     map_test_for_loop_all<ankerl::unordered_dense::sharding_map<std::string, uint64_t>>();
-    map_test_for_loop_all<ankerl::unordered_dense::segment_sharding_map<std::string, uint64_t>>();
+    map_test_for_loop_all<ankerl::unordered_dense::segmented_sharding_map<std::string, uint64_t>>();
     set_test_for_loop_all<ankerl::unordered_dense::sharding_set<std::string>>();
-    set_test_for_loop_all<ankerl::unordered_dense::segment_sharding_set<std::string>>();
+    set_test_for_loop_all<ankerl::unordered_dense::segmented_sharding_set<std::string>>();
 }
