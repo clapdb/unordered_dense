@@ -136,32 +136,28 @@ class horizontal_sharded_table {
         }
         
         constexpr auto operator+(difference_type n) noexcept -> iteratorT {
-            // difference_type distance_to_end_in_current_shard = _table->_maps[_shard].end() - _it;
-            // auto it = _it;
-            // auto target_shard = _shard;
-            // difference_type switch_shard = 0;
-
-            // while (n >= distance_to_end_in_current_shard) {
-            //     if (ANKERL_UNORDERED_DENSE_UNLIKELY(_shard == Shards - 1)) {
-            //         // out of range
-            //         return _table->end();
-            //     }
-            //     n -= distance_to_end_in_current_shard;
-            //     it = _table->_maps[++target_shard].begin();
-            //     // update distance to end in next shard
-            //     // size() is fastest way to get the distance to end in next shard
-            //     distance_to_end_in_current_shard = static_cast<difference_type>(_table->_maps[target_shard].size());
-            //     switch_shard = 1;
-            // }
-            // // the target is in the current shard
-            // return iteratorT(_table, _shard, it + (n - switch_shard));
-            iteratorT new_iter{*this};
-            for (difference_type i = 0; i < n; ++i) {
-                ++new_iter;
-                // std::cout << "new_iter key: " << *(new_iter._it->first) << std::endl;
-                // std::cout << "new_iter value: " << new_iter._it->second << std::endl;
+            if (_table->_maps[_shard].end() - _it > n) {
+                return iteratorT(_table, _shard, _it + n);
             }
-            return new_iter;
+            // else move to next shards
+            n -= (_table->_maps[_shard].end() - _it);
+            auto current_shard = _shard + 1;
+            // for-loop current shard to last shard, to find the nth after element from current shard
+            while (n >= 0 and current_shard < Shards) {
+                auto shard_size = _table->_maps[current_shard].size();
+                if (ANKERL_UNORDERED_DENSE_LIKELY(shard_size > 0)) {
+                    if (n < static_cast<difference_type>(shard_size)) {
+                        break;
+                    }
+                    n -= shard_size;
+                }
+                ++current_shard;
+            }
+            if (ANKERL_UNORDERED_DENSE_UNLIKELY(current_shard == Shards)) {
+                // out of range, just return the end iterator
+                return _table->end();
+            }
+            return iteratorT(_table, current_shard, _table->_maps[current_shard].begin() + n);
         }
 
         template<bool OtherIsConst>
