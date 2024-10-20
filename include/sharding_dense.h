@@ -787,12 +787,12 @@ private:
 
 ANKERL_UNORDERED_DENSE_EXPORT template <class Key,
                                         class T,
+                                        uint32_t Shard = 8,
                                         class Hash = hash<Key>,
                                         class KeyEqual = std::equal_to<Key>,
                                         class AllocatorOrContainer = std::allocator<std::pair<Key, T>>,
                                         class Bucket = bucket_type::standard,
                                         class BucketContainer = detail::default_container_t,
-                                        uint32_t Shard = 8,
                                         template <typename, typename> class ValueContainer = std::vector>
 using sharding_map = detail::horizontal_sharded_table<Key,
                                                       T,
@@ -807,12 +807,12 @@ using sharding_map = detail::horizontal_sharded_table<Key,
                                                       ValueContainer>;
 
 ANKERL_UNORDERED_DENSE_EXPORT template <class Key,
+                                        uint32_t Shard = 8,
                                         class Hash = hash<Key>,
                                         class KeyEqual = std::equal_to<Key>,
                                         class AllocatorOrContainer = std::allocator<Key>,
                                         class Bucket = bucket_type::standard,
                                         class BucketContainer = detail::default_container_t,
-                                        uint32_t Shard = 8,
                                         template <typename, typename> class ValueContainer = std::vector>
 using sharding_set = detail::horizontal_sharded_table<Key,
                                                       void,
@@ -826,15 +826,14 @@ using sharding_set = detail::horizontal_sharded_table<Key,
                                                       detail::shard_dispatcher<Shard>,
                                                       ValueContainer>;
 
-// Start Generation Here
 template <class Key,
           class T,
+          uint32_t Shard = 8,
           class Hash = hash<Key>,
           class KeyEqual = std::equal_to<Key>,
           class AllocatorOrContainer = std::allocator<std::pair<Key, T>>,
           class Bucket = bucket_type::standard,
           class BucketContainer = detail::default_container_t,
-          uint32_t Shard = 8,
           template <typename, typename> class ValueContainer = std::vector>
 using segmented_sharding_map = detail::horizontal_sharded_table<Key,
                                                               T,
@@ -847,25 +846,25 @@ using segmented_sharding_map = detail::horizontal_sharded_table<Key,
                                                               Shard,
                                                               detail::shard_dispatcher<Shard>,
                                                               ValueContainer>;
-    // Start Generation Here
-    template <class Key,
-              class Hash = hash<Key>,
-              class KeyEqual = std::equal_to<Key>,
-              class AllocatorOrContainer = std::allocator<Key>,
-              class Bucket = bucket_type::standard,
-              class BucketContainer = detail::default_container_t,
-              uint32_t Shard = 8,
-              template <typename, typename> class ValueContainer = std::vector>
-    using segmented_sharding_set = detail::horizontal_sharded_table<Key,
-                                                                  void,
-                                                                  Hash,
-                                                                  KeyEqual,
-                                                                  AllocatorOrContainer,
-                                                                  Bucket,
-                                                                  BucketContainer,
-                                                                  true,
-                                                                  Shard,
-                                                                  detail::shard_dispatcher<Shard>,
-                                                                  ValueContainer>;
+
+template <class Key,
+          uint32_t Shard = 8,
+          class Hash = hash<Key>,
+          class KeyEqual = std::equal_to<Key>,
+          class AllocatorOrContainer = std::allocator<Key>,
+          class Bucket = bucket_type::standard,
+          class BucketContainer = detail::default_container_t,
+          template <typename, typename> class ValueContainer = std::vector>
+using segmented_sharding_set = detail::horizontal_sharded_table<Key,
+                                                                void,
+                                                                Hash,
+                                                                KeyEqual,
+                                                                AllocatorOrContainer,
+                                                                Bucket,
+                                                                BucketContainer,
+                                                                true,
+                                                                Shard,
+                                                                detail::shard_dispatcher<Shard>,
+                                                                ValueContainer>;
 
 }  // namespace ankerl::unordered_dense
