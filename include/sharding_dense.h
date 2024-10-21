@@ -238,6 +238,7 @@ private:
     }
 
     public:
+    using Sharding_ = void;
     // iterator member functions
     auto begin() -> iterator {
         // find the first non-empty shard
