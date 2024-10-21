@@ -752,3 +752,43 @@ TEST_CASE("for-loop-all") {
     set_test_for_loop_all<ankerl::unordered_dense::sharding_set<std::string>>();
     set_test_for_loop_all<ankerl::unordered_dense::segmented_sharding_set<std::string>>();
 }
+
+struct vector_hash {
+    auto operator()(const std::vector<char>& vec) const noexcept -> uint64_t {
+        return ankerl::unordered_dense::detail::wyhash::hash(vec.data(), vec.size());
+    }
+};
+
+TEST_CASE("vector as key") {
+    ankerl::unordered_dense::sharding_map<std::vector<char>, uint64_t, 16, vector_hash> map;
+    map.emplace({'a', 'b', 'c'}, 1);
+    map.emplace({'d', 'e', 'f'}, 2);
+    map.emplace({'g', 'h', 'i'}, 3);
+    REQUIRE(map.size() == 3);
+
+    for (auto& [key, value] : map) {
+        CHECK_EQ(map[key], value);
+        fmt::print("{}: {}\n", key.data(), value);
+    }
+}
+
+
+template<typename Map>
+void map_test_begin() {
+    Map map;
+    CHECK_EQ(map.begin(), map.end());
+    map.emplace(std::string("x"), 1);
+    CHECK_NE(map.begin(), map.end());
+    CHECK_EQ(map.begin()->first, "x");
+    map.clear();
+    CHECK_EQ(map.begin(), map.end());
+    map.emplace(std::string("y"), 2);
+    CHECK_NE(map.begin(), map.end());
+    CHECK_EQ(map.begin()->first, "y");
+    CHECK_EQ(map.begin()->second, 2);
+}
+
+TEST_CASE("begin") {
+    map_test_begin<ankerl::unordered_dense::sharding_map<std::string, uint64_t, 256>>();
+    map_test_begin<ankerl::unordered_dense::segmented_sharding_map<std::string, uint64_t, 256>>();
+}

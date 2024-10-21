@@ -240,15 +240,27 @@ private:
     public:
     // iterator member functions
     auto begin() -> iterator {
-        return iterator(this, 0, _maps[0].begin());
+        // find the first non-empty shard
+        for (uint32_t i = 0; i < Shards; ++i) {
+            if (not _maps[i].empty()) {
+                return iterator(this, i, _maps[i].begin());
+            }
+        }
+        return end();
     }
 
     auto begin() const -> const_iterator {
-        return const_iterator(this, 0, _maps[0].begin());
+        // find the first non-empty shard
+        for (uint32_t i = 0; i < Shards; ++i) {
+            if (not _maps[i].empty()) {
+                return const_iterator(this, i, _maps[i].begin());
+            }
+        }
+        return end();
     }
 
     auto cbegin() const -> const_iterator {
-        return const_iterator(this, 0, _maps[0].begin());
+        return begin();
     }
 
     auto end() -> iterator {
