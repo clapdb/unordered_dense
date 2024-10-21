@@ -781,6 +781,10 @@ private:
         return _maps[shard].values();
     }
 
+    auto internals() const -> const std::array<internal_table, Shards>& {
+        return _maps;
+    }
+
     friend auto operator==(horizontal_sharded_table const& a, horizontal_sharded_table const& b) -> bool {
         for (uint32_t shard = 0; shard < Shards; ++shard) {
             if (a._maps[shard] != b._maps[shard]) {

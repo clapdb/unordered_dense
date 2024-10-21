@@ -778,11 +778,15 @@ void map_test_begin() {
     Map map;
     CHECK_EQ(map.begin(), map.end());
     map.emplace(std::string("x"), 1);
+    const auto& internal_map = map.internals();
+    CHECK(internal_map[0].empty());
     CHECK_NE(map.begin(), map.end());
     CHECK_EQ(map.begin()->first, "x");
     map.clear();
     CHECK_EQ(map.begin(), map.end());
     map.emplace(std::string("y"), 2);
+    const auto& internal_map2 = map.internals();
+    CHECK(internal_map2[0].empty());
     CHECK_NE(map.begin(), map.end());
     CHECK_EQ(map.begin()->first, "y");
     CHECK_EQ(map.begin()->second, 2);
