@@ -162,11 +162,12 @@ class horizontal_sharded_table {
 
         template<bool OtherIsConst>
         constexpr auto operator-(iteratorT<OtherIsConst> const& other) const noexcept -> difference_type {
+            assert(_table == other._table);
             if (_shard == other._shard) {
                 return _it - other._it;
             } else if (_shard > other._shard) {
                 // other is in previous shard
-                difference_type distance = other.end() - other._it;
+                difference_type distance = other._table->_maps[other._shard].end() - other._it;
                 for (uint32_t i = other._shard + 1; i < _shard; ++i) {
                     distance += _table->_maps[i].size();
                 }
@@ -178,7 +179,7 @@ class horizontal_sharded_table {
             for (uint32_t i = _shard + 1; i < other._shard; ++i) {
                 distance += _table->_maps[i].size();
             }
-            distance += other._it - other._maps[other._shard].begin();
+            distance += other._it - other._table->_maps[other._shard].begin();
             return -distance;
         }
 
@@ -225,12 +226,14 @@ class horizontal_sharded_table {
 private:
     std::array<internal_table, Shards> _maps{};
     Dispatcher _dispatcher{};
+    uint32_t _size = 0;
 
 private:
     struct dispatch_result_t {
         uint64_t hash;
         uint32_t shard;
     };
+
 
     auto dispatch(const Key& key) const -> dispatch_result_t {
         auto hash = _maps[0].mixed_hash(key);
@@ -277,29 +280,34 @@ private:
     }
 
     [[nodiscard]] auto empty() const -> bool {
-        return std::all_of(_maps.begin(), _maps.end(), [](const auto& map) { return map.empty(); });
+        return _size == 0;
     }
     [[nodiscard]] auto size() const -> size_t {
-        return std::accumulate(_maps.begin(), _maps.end(), size_t{0}, [](size_t sum, const auto& map) { return sum + map.size(); });
+        return _size;
     }
     [[nodiscard]] auto max_size() const -> size_t {
-        return _maps[0].max_size();
+        return std::numeric_limits<decltype(_size)>::max();
     }
 
     auto clear() -> void {
         for (auto& map : _maps) {
             map.clear();
         }
+        _size = 0;
     }
 
     auto insert(value_type const& value) -> std::pair<iterator, bool> {
         if constexpr (is_map_v<T>) {
             auto dispatch_result = dispatch(value.first);
-            return _maps[dispatch_result.shard].emplace_with_hash(dispatch_result.hash, value);
+            auto [internal_iter, success] = _maps[dispatch_result.shard].emplace_with_hash(dispatch_result.hash, value);
+            _size += uint32_t(success);
+            return {iterator(this, dispatch_result.shard, internal_iter), success};
         }
         static_assert(std::is_constructible_v<Key, decltype(value)> && not is_map_v<T>);
         auto dispatch_result = dispatch(value);
-        return _maps[dispatch_result.shard].emplace_with_hash(dispatch_result.hash, value);
+        auto [internal_iter, success] = _maps[dispatch_result.shard].emplace_with_hash(dispatch_result.hash, value);
+        _size += uint32_t(success);
+        return {iterator(this, dispatch_result.shard, internal_iter), success};
     }
 
     auto insert(value_type&& value) -> std::pair<iterator, bool> {
@@ -308,6 +316,7 @@ private:
             Key key{value.first};
             auto dispatch_result = dispatch(key);
             auto [internal_iter, success] = _maps[dispatch_result.shard].emplace_with_hash(dispatch_result.hash, std::move(value.first), std::move(value.second));
+            _size += uint32_t(success);
             return {iterator(this, dispatch_result.shard, internal_iter), success};
         } else {
             static_assert(std::is_constructible_v<Key, decltype(value)> && not is_map_v<T>);
@@ -315,6 +324,7 @@ private:
             auto dispatch_result = dispatch(key);
             auto [internal_iter, success] =
                 _maps[dispatch_result.shard].emplace_with_hash(dispatch_result.hash, std::move(value));
+            _size += uint32_t(success);
             return {iterator(this, dispatch_result.shard, internal_iter), success};
         }
     }
@@ -365,6 +375,7 @@ private:
     auto insert_or_assign(Key const& key, M&& mapped) -> std::pair<iterator, bool> {
         auto dispatch_result = dispatch(key);
         auto [internal_iter, success] = _maps[dispatch_result.shard].do_insert_or_assign_with_hash(dispatch_result.hash, key, std::forward<M>(mapped));
+        _size += uint32_t(success);
         return {iterator(this, dispatch_result.shard, internal_iter), success};
     }
 
@@ -372,6 +383,7 @@ private:
     auto insert_or_assign(Key&& key, M&& mapped) -> std::pair<iterator, bool> {
         auto dispatch_result = dispatch(key);
         auto [internal_iter, success] = _maps[dispatch_result.shard].do_insert_or_assign_with_hash(dispatch_result.hash, std::forward<Key>(key), std::forward<M>(mapped));
+        _size += uint32_t(success);
         return {iterator(this, dispatch_result.shard, internal_iter), success};
     }
 
@@ -384,16 +396,16 @@ private:
     auto insert_or_assign(K&& key, M&& mapped) -> std::pair<iterator, bool> {
         auto dispatch_result = dispatch(key);
         auto [internal_iter, success] = _maps[dispatch_result.shard].do_insert_or_assign_with_hash(dispatch_result.hash, std::forward<K>(key), std::forward<M>(mapped));
+        _size += uint32_t(success);
         return {iterator(this, dispatch_result.shard, internal_iter), success};
     }
 
     template<class M, typename Q = T, std::enable_if_t<is_map_v<Q>, bool> = true>
     auto insert_or_assign(const_iterator /*hint*/, Key const& key, M&& mapped) -> iterator {
         auto dispatch_result = dispatch(key);
-        return {
-            this,
-            dispatch_result.shard,
-            _maps[dispatch_result.shard].do_insert_or_assign_with_hash(dispatch_result.hash, key, std::forward<M>(mapped)).first};
+        auto [internal_iter, success] = _maps[dispatch_result.shard].do_insert_or_assign_with_hash(dispatch_result.hash, key, std::forward<M>(mapped));
+        _size += uint32_t(success);
+        return {iterator(this, dispatch_result.shard, internal_iter), success};
     }
 
     template<class M, typename Q = T, std::enable_if_t<is_map_v<Q>, bool> = true>
@@ -401,6 +413,7 @@ private:
         auto dispatch_result = dispatch(key);
         auto [internal_iter, success] = _maps[dispatch_result.shard].do_insert_or_assign_with_hash(
             dispatch_result.hash, std::move(key), std::forward<M>(mapped));
+        _size += uint32_t(success);
         return {this, dispatch_result.shard, internal_iter};
     }
     
@@ -413,6 +426,7 @@ private:
     auto insert_or_assign(const_iterator /*hint*/, K&& key, M&& mapped) -> iterator {
         auto dispatch_result = dispatch(key);
         auto [internal_iter, success] = _maps[dispatch_result.shard].do_insert_or_assign_with_hash(dispatch_result.hash, std::forward<K>(key), std::forward<M>(mapped));
+        _size += uint32_t(success);
         return {this, dispatch_result.shard, internal_iter};
     }
 
@@ -423,7 +437,10 @@ private:
               std::enable_if_t<!is_map_v<Q> && is_transparent_v<H, KE>, bool> = true>
     auto emplace(K&& key) -> std::pair<iterator, bool> {
         auto dispatch_result = dispatch(key);
-        return _maps[dispatch_result.shard].emplace_with_hash(dispatch_result.hash, std::forward<K>(key));
+        auto [internal_iter, success] =
+            _maps[dispatch_result.shard].emplace_with_hash(dispatch_result.hash, std::forward<K>(key));
+        _size += uint32_t(success);
+        return {iterator(this, dispatch_result.shard, internal_iter), success};
     }
 
     template<class... Args>
@@ -431,6 +448,7 @@ private:
         auto dispatch_result = dispatch(key);
         auto [internal_iter, success] = _maps[dispatch_result.shard].emplace_with_hash(
             dispatch_result.hash, std::forward<Key>(key), std::forward<Args>(args)...);
+        _size += uint32_t(success);
         return {iterator(this, dispatch_result.shard, internal_iter), success};
     }
 
@@ -439,6 +457,7 @@ private:
         auto dispatch_result = dispatch(key);
         auto [internal_iter, success] = _maps[dispatch_result.shard].emplace_with_hash(
             dispatch_result.hash, std::forward<Key>(key), std::forward<Args>(args)...);
+        _size += uint32_t(success);
         return {this, dispatch_result.shard, internal_iter};
     }
 
@@ -447,6 +466,7 @@ private:
         auto dispatch_result = dispatch(key);
         auto [internal_iter, success] = _maps[dispatch_result.shard].do_try_emplace_with_hash(
             dispatch_result.hash, key, std::forward<Args>(args)...);
+        _size += uint32_t(success);
         return {iterator(this, dispatch_result.shard, internal_iter), success};
     }
 
@@ -455,6 +475,7 @@ private:
         auto dispatch_result = dispatch(key);
         auto [internal_iter, success] = _maps[dispatch_result.shard].do_try_emplace_with_hash(
             dispatch_result.hash, std::forward<Key>(key), std::forward<Args>(args)...);
+        _size += uint32_t(success);
         return {iterator(this, dispatch_result.shard, internal_iter), success};
     }
 
@@ -463,6 +484,7 @@ private:
         auto dispatch_result = dispatch(key);
         auto [internal_iter, success] = _maps[dispatch_result.shard].do_try_emplace_with_hash(
             dispatch_result.hash, key, std::forward<Args>(args)...);
+        _size += uint32_t(success);
         return {this, dispatch_result.shard, internal_iter};
     }
 
@@ -471,6 +493,7 @@ private:
         auto dispatch_result = dispatch(key);
         auto [internal_iter, success] = _maps[dispatch_result.shard].do_try_emplace_with_hash(
             dispatch_result.hash, std::forward<Key>(key), std::forward<Args>(args)...);
+        _size += uint32_t(success);
         return {this, dispatch_result.shard, internal_iter};
     }
 
@@ -486,6 +509,7 @@ private:
         auto dispatch_result = dispatch(key);
         auto [internal_iter, success] = _maps[dispatch_result.shard].do_try_emplace_with_hash(
             dispatch_result.hash, std::forward<K>(key), std::forward<Args>(args)...);
+        _size += uint32_t(success);
         return {iterator(this, dispatch_result.shard, internal_iter), success};
     }
 
@@ -501,6 +525,7 @@ private:
         auto dispatch_result = dispatch(key);
         auto [internal_iter, success] = _maps[dispatch_result.shard].do_try_emplace_with_hash(
             dispatch_result.hash, std::forward<K>(key), std::forward<Args>(args)...);
+        _size += uint32_t(success);
         return {this, dispatch_result.shard, internal_iter};
     }
 
@@ -508,11 +533,13 @@ private:
     // erase a single iterator
     auto erase(iterator it) -> iterator {
         assert(it._table == this);
+        _size -= (it != end());
         return iterator(this, it._shard, _maps[it._shard].erase(it._it));
     }
             
     auto extract(iterator it) -> value_type {
         assert(it._table == this);
+        --_size;
         return _maps[it._shard].extract(it._it);
     }
 
@@ -521,6 +548,7 @@ private:
         assert(first._table == this);
         assert(last._table == this);
         assert(last._shard >= first._shard);
+        _size -= uint32_t(last - first);
         if (first._shard == last._shard) {
             return iterator(this, first._shard, _maps[first._shard].erase(first._it, last._it));
         }
@@ -538,13 +566,17 @@ private:
     auto erase(const Key& key) -> size_t {
         auto dispatch_result = dispatch(key);
         // every low probability function, just dispatch, no need to avoid duplicated hashing call.
-        return _maps[dispatch_result.shard].erase(key);
+        auto removed = _maps[dispatch_result.shard].erase(key);
+        _size -= uint32_t(removed);
+        return removed;
     }
 
     auto extract(const Key& key) -> std::optional<value_type> {
         auto dispatch_result = dispatch(key);
         // every low probability function, just dispatch, no need to avoid duplicated hashing call.
-        return _maps[dispatch_result.shard].extract(key);
+        auto extracted = _maps[dispatch_result.shard].extract(key);
+        _size -= uint32_t(extracted.has_value());
+        return extracted;
     }
 
     template <class K,
@@ -553,7 +585,9 @@ private:
               std::enable_if_t<is_transparent_v<H, KE>, bool> = true>
     auto erase(K&& key) -> size_t {
         auto dispatch_result = dispatch(key);
-        return _maps[dispatch_result.shard].erase(std::forward<K>(key));
+        auto removed = _maps[dispatch_result.shard].erase(std::forward<K>(key));
+        _size -= uint32_t(removed);
+        return removed;
     }
 
     template <class K,
@@ -562,7 +596,9 @@ private:
               std::enable_if_t<is_transparent_v<H, KE>, bool> = true>
     auto extract(K&& key) -> std::optional<value_type> {
         auto dispatch_result = dispatch(key);
-        return _maps[dispatch_result.shard].extract(std::forward<K>(key));
+        auto extracted = _maps[dispatch_result.shard].extract(std::forward<K>(key));
+        _size -= uint32_t(extracted.has_value());
+        return extracted;
     }
 
     void swap(horizontal_sharded_table& other) noexcept(noexcept(std::is_nothrow_swappable_v<value_container_type> &&
@@ -783,6 +819,10 @@ private:
     }
 
     auto internals() const -> const std::array<internal_table, Shards>& {
+        return _maps;
+    }
+
+    auto internals() -> std::array<internal_table, Shards>& {
         return _maps;
     }
 
