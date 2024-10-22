@@ -593,7 +593,7 @@ private:
         }
 
         template <bool OtherIsConst>
-        constexpr auto operator-(iter_t<OtherIsConst> const& other) noexcept -> difference_type {
+        constexpr auto operator-(iter_t<OtherIsConst> const& other) const noexcept -> difference_type {
             return static_cast<difference_type>(m_idx) - static_cast<difference_type>(other.m_idx);
         }
 
